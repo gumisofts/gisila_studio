@@ -26,7 +26,8 @@ String renderListPage({
   final displayCols = admin.effectiveListDisplay;
   final colInfoMap = {for (final c in columns) c.name: c};
 
-  final headers = displayCols.map((col) => '<th>${_esc(_humanize(col))}</th>').join('\n');
+  final headers =
+      displayCols.map((col) => '<th>${_esc(_humanize(col))}</th>').join('\n');
 
   final rowsHtml = rows.isEmpty
       ? '''
@@ -52,8 +53,10 @@ String renderListPage({
             final display = info?.display(value) ?? (value?.toString() ?? '—');
             final isFirst = col == displayCols.first;
 
-            if (display == '✓') return '<td><span class="bool-yes">Yes</span></td>';
-            if (display == '✗') return '<td><span class="bool-no">No</span></td>';
+            if (display == '✓')
+              return '<td><span class="bool-yes">Yes</span></td>';
+            if (display == '✗')
+              return '<td><span class="bool-no">No</span></td>';
 
             if (isFirst) return '<td class="td-primary">${_esc(display)}</td>';
 
@@ -90,14 +93,18 @@ String renderListPage({
         </div>'''
       : '';
 
-  final totalPages = (totalCount / pageSize).ceil().clamp(1, double.infinity).toInt();
+  final totalPages =
+      (totalCount / pageSize).ceil().clamp(1, double.infinity).toInt();
   final rangeStart = rows.isEmpty ? 0 : (page - 1) * pageSize + 1;
   final rangeEnd = (page - 1) * pageSize + rows.length;
 
-  String pgLink(int p, String label, {bool disabled = false, bool current = false}) {
+  String pgLink(int p, String label,
+      {bool disabled = false, bool current = false}) {
     if (disabled) return '<span class="disabled">$label</span>';
     if (current) return '<span class="current">$label</span>';
-    final q = searchQuery != null ? '&q=${Uri.encodeQueryComponent(searchQuery)}' : '';
+    final q = searchQuery != null
+        ? '&q=${Uri.encodeQueryComponent(searchQuery)}'
+        : '';
     return '<a href="$prefix/$table/?page=$p$q">$label</a>';
   }
 
@@ -105,9 +112,17 @@ String renderListPage({
   pgLinks.write(pgLink(page - 1, '‹', disabled: page <= 1));
   final first = (page - 2).clamp(1, totalPages);
   final last = (page + 2).clamp(1, totalPages);
-  if (first > 1) { pgLinks.write(pgLink(1, '1')); if (first > 2) pgLinks.write('<span>…</span>'); }
-  for (var p = first; p <= last; p++) { pgLinks.write(pgLink(p, '$p', current: p == page)); }
-  if (last < totalPages) { if (last < totalPages - 1) pgLinks.write('<span>…</span>'); pgLinks.write(pgLink(totalPages, '$totalPages')); }
+  if (first > 1) {
+    pgLinks.write(pgLink(1, '1'));
+    if (first > 2) pgLinks.write('<span>…</span>');
+  }
+  for (var p = first; p <= last; p++) {
+    pgLinks.write(pgLink(p, '$p', current: p == page));
+  }
+  if (last < totalPages) {
+    if (last < totalPages - 1) pgLinks.write('<span>…</span>');
+    pgLinks.write(pgLink(totalPages, '$totalPages'));
+  }
   pgLinks.write(pgLink(page + 1, '›', disabled: page >= totalPages));
 
   final subtitle = searchQuery != null

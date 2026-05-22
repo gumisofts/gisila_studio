@@ -66,7 +66,13 @@ Future<void> main() async {
     BookTable.metadata,
     displayName: 'Book',
     displayNamePlural: 'Books',
-    listDisplay: ['title', 'subtitle', 'author_id', 'published_date', 'page_count'],
+    listDisplay: [
+      'title',
+      'subtitle',
+      'author_id',
+      'published_date',
+      'page_count'
+    ],
     searchFields: ['title', 'subtitle', 'isbn'],
     ordering: ['-published_date'],
   );
@@ -75,7 +81,14 @@ Future<void> main() async {
     ReviewTable.metadata,
     displayName: 'Review',
     displayNamePlural: 'Reviews',
-    listDisplay: ['id', 'book_id', 'reviewer_id', 'rating', 'review_date', 'is_approved'],
+    listDisplay: [
+      'id',
+      'book_id',
+      'reviewer_id',
+      'rating',
+      'review_date',
+      'is_approved'
+    ],
     searchFields: ['review_text'],
     readonlyFields: ['id'],
     ordering: ['-review_date'],
@@ -91,9 +104,8 @@ Future<void> main() async {
   // Mount the studio at /studio
   router.mount('/studio', studio.handler(prefix: '/studio'));
 
-  final pipeline = const Pipeline()
-      .addMiddleware(logRequests())
-      .addHandler(router.call);
+  final pipeline =
+      const Pipeline().addMiddleware(logRequests()).addHandler(router.call);
 
   // ── Start server ───────────────────────────────────────────────────
 

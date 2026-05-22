@@ -129,7 +129,8 @@ class GisilaStudio {
   /// empty string: `prefix: ''`.
   Handler handler({String prefix = '/studio'}) {
     // Normalise: no trailing slash.
-    final p = prefix.endsWith('/') ? prefix.substring(0, prefix.length - 1) : prefix;
+    final p =
+        prefix.endsWith('/') ? prefix.substring(0, prefix.length - 1) : prefix;
 
     return buildStudioHandler(
       admins: List.unmodifiable(_admins),

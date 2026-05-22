@@ -44,8 +44,15 @@ String renderDashboard({
     groups.putIfAbsent(a.group ?? 'General', () => []).add(a);
   }
   const preferred = [
-    'Users & Auth', 'Catalog', 'Business', 'Products',
-    'Commerce', 'Social', 'Moderation', 'Platform', 'General',
+    'Users & Auth',
+    'Catalog',
+    'Business',
+    'Products',
+    'Commerce',
+    'Social',
+    'Moderation',
+    'Platform',
+    'General',
   ];
   final order = [
     ...preferred.where(groups.containsKey),
@@ -55,7 +62,8 @@ String renderDashboard({
   final sections = order.map((g) {
     final tiles = groups[g]!.map((a) {
       final count = counts[a.meta.tableName] ?? 0;
-      final initial = a.displayName.isNotEmpty ? a.displayName[0].toUpperCase() : '?';
+      final initial =
+          a.displayName.isNotEmpty ? a.displayName[0].toUpperCase() : '?';
       return '''
         <a class="model-tile" href="$prefix/${a.meta.tableName}/">
           <div class="model-tile-ic">$initial</div>
@@ -93,10 +101,8 @@ String renderDashboard({
   );
 }
 
-String _esc(String s) => s
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;');
+String _esc(String s) =>
+    s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;');
 
 String _fmt(int n) {
   if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';

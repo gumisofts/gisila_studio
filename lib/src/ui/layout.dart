@@ -156,11 +156,16 @@ String renderLayout({
 /// Parses a `?_msg=` query param into a flash message.
 (String? message, bool isError) parseFlashMessage(String? msg) {
   switch (msg) {
-    case 'added':   return ('Record created successfully.', false);
-    case 'saved':   return ('Changes saved.', false);
-    case 'deleted': return ('Record deleted.', false);
-    case 'action':  return ('Action completed.', false);
-    default:        return (null, false);
+    case 'added':
+      return ('Record created successfully.', false);
+    case 'saved':
+      return ('Changes saved.', false);
+    case 'deleted':
+      return ('Record deleted.', false);
+    case 'action':
+      return ('Action completed.', false);
+    default:
+      return (null, false);
   }
 }
 
@@ -178,8 +183,15 @@ String _renderSidebar({
   }
 
   const preferred = [
-    'Users & Auth', 'Catalog', 'Business', 'Products',
-    'Commerce', 'Social', 'Moderation', 'Platform', 'General',
+    'Users & Auth',
+    'Catalog',
+    'Business',
+    'Products',
+    'Commerce',
+    'Social',
+    'Moderation',
+    'Platform',
+    'General',
   ];
   final order = [
     ...preferred.where(groups.containsKey),
@@ -190,7 +202,8 @@ String _renderSidebar({
     final items = groups[g]!.map((a) {
       final isActive = a.meta.tableName == activeTable;
       final count = modelCounts[a.meta.tableName];
-      final badge = count != null ? '<span class="nav-badge">${_fmt(count)}</span>' : '';
+      final badge =
+          count != null ? '<span class="nav-badge">${_fmt(count)}</span>' : '';
       return '''
         <a class="nav-item${isActive ? ' active' : ''}" href="$prefix/${a.meta.tableName}/">
           ${_esc(a.displayNamePlural)}$badge

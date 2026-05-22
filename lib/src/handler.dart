@@ -56,8 +56,7 @@ Handler buildStudioHandler({
 
   Response redir(String location) => Response.found(location);
 
-  Map<String, String> qparams(Request req) =>
-      req.requestedUri.queryParameters;
+  Map<String, String> qparams(Request req) => req.requestedUri.queryParameters;
 
   Future<Map<String, String>> bodyParams(Request req) async {
     final raw = await req.readAsString();
@@ -128,17 +127,15 @@ Handler buildStudioHandler({
     final whereClause = searchQuery != null && searchClauses.isNotEmpty
         ? 'WHERE ${searchClauses.join(' OR ')}'
         : '';
-    final searchParam = searchQuery != null
-        ? <Object?>['%$searchQuery%']
-        : <Object?>[];
+    final searchParam =
+        searchQuery != null ? <Object?>['%$searchQuery%'] : <Object?>[];
 
     final c = newCtx();
 
     final countSql =
         'SELECT COUNT(*)::bigint AS c FROM "${table}" $whereClause';
     final countResult = await c.execute(countSql, parameters: searchParam);
-    final totalCount =
-        (countResult.first.toColumnMap()['c'] as num).toInt();
+    final totalCount = (countResult.first.toColumnMap()['c'] as num).toInt();
 
     final rowsSql = 'SELECT * FROM "${table}" $whereClause '
         'ORDER BY ${admin.orderBySql} '
@@ -242,12 +239,10 @@ Handler buildStudioHandler({
       final newPk = newRow?[admin.meta.primaryKey]?.toString();
 
       return switch (action) {
-        'save_continue' when newPk != null =>
-          redir('$prefix/$table/${Uri.encodeComponent(newPk)}/change/?_msg=added'),
-        'save_add' =>
-          redir('$prefix/$table/add/'),
-        _ =>
-          redir('$prefix/$table/?_msg=added'),
+        'save_continue' when newPk != null => redir(
+            '$prefix/$table/${Uri.encodeComponent(newPk)}/change/?_msg=added'),
+        'save_add' => redir('$prefix/$table/add/'),
+        _ => redir('$prefix/$table/?_msg=added'),
       };
     } catch (e) {
       final counts = await fetchCounts();
@@ -275,8 +270,7 @@ Handler buildStudioHandler({
 
     final row = await fetchRow(admin, pk);
     if (row == null) {
-      return Response.notFound(
-          '${admin.displayName} with pk=$pk not found');
+      return Response.notFound('${admin.displayName} with pk=$pk not found');
     }
 
     final colInfos = await fetchColumns(table);
@@ -362,10 +356,8 @@ Handler buildStudioHandler({
       return switch (action) {
         'save_continue' =>
           redir('$prefix/$table/${Uri.encodeComponent(pk)}/change/?_msg=saved'),
-        'save_add' =>
-          redir('$prefix/$table/add/'),
-        _ =>
-          redir('$prefix/$table/?_msg=saved'),
+        'save_add' => redir('$prefix/$table/add/'),
+        _ => redir('$prefix/$table/?_msg=saved'),
       };
     } catch (e) {
       final row = await fetchRow(admin, pk);
@@ -468,10 +460,8 @@ Handler buildStudioHandler({
     final ids = multi['ids'] ?? [];
 
     if (action == 'delete' && ids.isNotEmpty) {
-      final placeholders =
-          ids.indexed.map((e) => '\$${e.$1 + 1}').join(', ');
-      final typedIds =
-          ids.map<Object>((id) => int.tryParse(id) ?? id).toList();
+      final placeholders = ids.indexed.map((e) => '\$${e.$1 + 1}').join(', ');
+      final typedIds = ids.map<Object>((id) => int.tryParse(id) ?? id).toList();
       await newCtx().execute(
         'DELETE FROM "${table}" '
         'WHERE "${admin.meta.primaryKey}" IN ($placeholders)',
@@ -570,8 +560,7 @@ String _buildInsertSql(String table, Map<String, Object?> values) {
   return 'INSERT INTO "$table" ($cols) VALUES ($placeholders) RETURNING *';
 }
 
-String _buildUpdateSql(
-    String table, String pk, Map<String, Object?> values) {
+String _buildUpdateSql(String table, String pk, Map<String, Object?> values) {
   final sets =
       values.keys.indexed.map((e) => '"${e.$2}" = \$${e.$1 + 1}').join(', ');
   final pkPlaceholder = '\$${values.length + 1}';

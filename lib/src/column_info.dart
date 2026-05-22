@@ -137,8 +137,7 @@ final Map<String, List<ColumnInfo>> _columnCache = {};
 
 /// Fetch column metadata for [tableName], using [db] for the first call.
 /// Results are cached for the process lifetime.
-Future<List<ColumnInfo>> fetchColumnInfo(
-    String tableName, DbContext db) async {
+Future<List<ColumnInfo>> fetchColumnInfo(String tableName, DbContext db) async {
   if (_columnCache.containsKey(tableName)) return _columnCache[tableName]!;
 
   const sql = '''

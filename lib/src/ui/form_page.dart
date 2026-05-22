@@ -51,7 +51,8 @@ String renderFormPage({
     ));
   }
 
-  final pageTitle = isAdd ? 'New ${admin.displayName}' : _rowTitle(existingRow, admin);
+  final pageTitle =
+      isAdd ? 'New ${admin.displayName}' : _rowTitle(existingRow, admin);
   final subtitle = isAdd
       ? 'Fill in the details to create a new ${admin.displayName.toLowerCase()}.'
       : 'Update the fields below and save your changes.';
@@ -118,7 +119,8 @@ String _buildField({
   String? errorMsg,
 }) {
   final inputType = info?.inputType ?? 'text';
-  final prefilledStr = info?.formValue(currentValue) ?? (currentValue?.toString() ?? '');
+  final prefilledStr =
+      info?.formValue(currentValue) ?? (currentValue?.toString() ?? '');
 
   final req = isRequired ? '<span class="req">*</span>' : '';
   final errorHtml = hasError && errorMsg != null
@@ -127,17 +129,20 @@ String _buildField({
 
   String inputHtml;
   if (isReadonly) {
-    inputHtml = '<div class="readonly-val">${_esc(prefilledStr.isEmpty ? '—' : prefilledStr)}</div>';
+    inputHtml =
+        '<div class="readonly-val">${_esc(prefilledStr.isEmpty ? '—' : prefilledStr)}</div>';
   } else if (inputType == 'checkbox') {
-    final checked = currentValue == true || currentValue == 'true' || currentValue == 1
-        ? ' checked'
-        : '';
+    final checked =
+        currentValue == true || currentValue == 'true' || currentValue == 1
+            ? ' checked'
+            : '';
     inputHtml = '<div class="checkbox-row">'
         '<input type="checkbox" id="f_$name" name="$name"$checked>'
         '<label for="f_$name">Enabled</label>'
         '</div>';
   } else if (inputType == 'textarea') {
-    inputHtml = '<textarea name="$name" id="f_$name" rows="4">${_esc(prefilledStr)}</textarea>';
+    inputHtml =
+        '<textarea name="$name" id="f_$name" rows="4">${_esc(prefilledStr)}</textarea>';
   } else {
     final step = inputType == 'number_decimal' ? ' step="any"' : '';
     final type = inputType == 'number_decimal' ? 'number' : inputType;
