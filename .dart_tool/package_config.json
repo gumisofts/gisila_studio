@@ -159,7 +159,7 @@
     },
     {
       "name": "gisila_orm",
-      "rootUri": "../../gisila_orm",
+      "rootUri": "file:///home/murad/.pub-cache/hosted/pub.dev/gisila_orm-0.0.1+5",
       "packageUri": "lib/",
       "languageVersion": "3.3"
     },
