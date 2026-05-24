@@ -39,12 +39,14 @@ String renderFormPage({
     final currentValue = existingRow?[colName];
     final hasError = fieldErrors.containsKey(colName);
 
+    final isPassword = admin.passwordFields.contains(colName);
     fieldBlocks.write(_buildField(
       name: colName,
       label: _humanize(colName),
       info: info,
       isReadonly: isReadonly,
       isRequired: isRequired,
+      isPassword: isPassword,
       currentValue: currentValue,
       hasError: hasError,
       errorMsg: fieldErrors[colName],
@@ -114,13 +116,16 @@ String _buildField({
   required ColumnInfo? info,
   required bool isReadonly,
   required bool isRequired,
+  required bool isPassword,
   required Object? currentValue,
   required bool hasError,
   String? errorMsg,
 }) {
-  final inputType = info?.inputType ?? 'text';
-  final prefilledStr =
-      info?.formValue(currentValue) ?? (currentValue?.toString() ?? '');
+  final inputType = isPassword ? 'password' : (info?.inputType ?? 'text');
+  // Never pre-fill password fields — avoids leaking hashes into the DOM.
+  final prefilledStr = isPassword
+      ? ''
+      : (info?.formValue(currentValue) ?? (currentValue?.toString() ?? ''));
 
   final req = isRequired ? '<span class="req">*</span>' : '';
   final errorHtml = hasError && errorMsg != null

@@ -50,6 +50,10 @@ class ModelAdmin<T> {
   /// Normalized to DB column names.
   final List<String> excludeFields;
 
+  /// Columns rendered as password inputs (masked, never pre-filled).
+  /// Normalized to DB column names.
+  final List<String> passwordFields;
+
   /// Number of rows per page in the list view.
   final int pageSize;
 
@@ -70,6 +74,7 @@ class ModelAdmin<T> {
     List<String> searchFields = const [],
     List<String> readonlyFields = const [],
     List<String> excludeFields = const [],
+    List<String> passwordFields = const [],
     this.pageSize = 25,
     List<String> ordering = const [],
     this.group,
@@ -83,6 +88,8 @@ class ModelAdmin<T> {
             readonlyFields.map((c) => _resolveColumn(c, meta))),
         excludeFields = List.unmodifiable(
             excludeFields.map((c) => _resolveColumn(c, meta))),
+        passwordFields = List.unmodifiable(
+            passwordFields.map((c) => _resolveColumn(c, meta))),
         ordering = List.unmodifiable(ordering.map((t) {
           if (t.startsWith('-')) {
             return '-${_resolveColumn(t.substring(1), meta)}';
@@ -124,6 +131,7 @@ ModelAdmin<T> buildModelAdmin<T>(
   List<String> searchFields = const [],
   List<String> readonlyFields = const [],
   List<String> excludeFields = const [],
+  List<String> passwordFields = const [],
   int pageSize = 25,
   List<String> ordering = const [],
   String? group,
@@ -137,6 +145,7 @@ ModelAdmin<T> buildModelAdmin<T>(
     searchFields: searchFields,
     readonlyFields: readonlyFields,
     excludeFields: excludeFields,
+    passwordFields: passwordFields,
     pageSize: pageSize,
     ordering: ordering,
     group: group,
