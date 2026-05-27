@@ -205,7 +205,7 @@ Handler buildStudioHandler({
       final rawVal = params[colName];
 
       try {
-        values[colName] = info?.parseFormValue(rawVal) ?? rawVal;
+        values[colName] = info == null ? rawVal : info.parseFormValue(rawVal);
       } catch (_) {
         errors[colName] = 'Invalid value: $rawVal';
       }
@@ -228,6 +228,12 @@ Handler buildStudioHandler({
         ),
         status: 422,
       );
+    }
+
+    // Auto-stamp any declared auto-now fields with the current UTC time.
+    final now = DateTime.now().toUtc();
+    for (final col in admin.autoNowOnUpdateFields) {
+      values[col] = now;
     }
 
     try {
@@ -314,7 +320,7 @@ Handler buildStudioHandler({
       final rawVal = params[colName];
 
       try {
-        values[colName] = info?.parseFormValue(rawVal) ?? rawVal;
+        values[colName] = info == null ? rawVal : info.parseFormValue(rawVal);
       } catch (_) {
         errors[colName] = 'Invalid value: $rawVal';
       }
@@ -340,6 +346,12 @@ Handler buildStudioHandler({
         ),
         status: 422,
       );
+    }
+
+    // Auto-stamp any declared auto-now fields with the current UTC time.
+    final now = DateTime.now().toUtc();
+    for (final col in admin.autoNowOnUpdateFields) {
+      values[col] = now;
     }
 
     if (values.isEmpty) {

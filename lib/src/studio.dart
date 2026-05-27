@@ -90,6 +90,10 @@ class GisilaStudio {
   /// * [searchFields] — columns to `ILIKE` search against.
   /// * [readonlyFields] — columns shown on forms but not editable.
   /// * [excludeFields] — columns completely hidden from forms.
+  /// * [autoNowOnUpdateFields] — columns automatically stamped with the current
+  ///   UTC timestamp on every save (create or update). Typically used together
+  ///   with [readonlyFields] so the user cannot edit the value manually while
+  ///   the studio still keeps it up-to-date, e.g. `['updatedAt']`.
   /// * [pageSize] — rows per page (default 25).
   /// * [ordering] — default list ordering; prefix with `-` for DESC,
   ///   e.g. `['-date_joined', 'email']`.
@@ -101,6 +105,7 @@ class GisilaStudio {
     List<String> searchFields = const [],
     List<String> readonlyFields = const [],
     List<String> excludeFields = const [],
+    List<String> autoNowOnUpdateFields = const [],
     int pageSize = 25,
     List<String> ordering = const [],
     String? group,
@@ -113,6 +118,7 @@ class GisilaStudio {
       searchFields: searchFields,
       readonlyFields: readonlyFields,
       excludeFields: excludeFields,
+      autoNowOnUpdateFields: autoNowOnUpdateFields,
       pageSize: pageSize,
       ordering: ordering,
       group: group,

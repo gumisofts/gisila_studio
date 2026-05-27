@@ -197,18 +197,18 @@ packages:
     dependency: "direct main"
     description:
       name: gisila_orm
-      sha256: "1d3f3ffc86b636504a9de2bf003e3438506863a9872f34246b8e6ba123494235"
+      sha256: "1285bebd4cd01643f5e823dad22b9a868677d8d159cd59ed71050c82667112e1"
       url: "https://pub.dev"
     source: hosted
-    version: "0.0.1+10"
+    version: "0.1.1"
   gisila_studio:
     dependency: "direct main"
     description:
       name: gisila_studio
-      sha256: e652073fe881d5e0148e1d51830492020f61bfb47fe172841fd3dd355dd53f7d
+      sha256: f52c2beabff82b1fa302b05466ad7860d2474bd55ed5de1da6d465e3bffc0167
       url: "https://pub.dev"
     source: hosted
-    version: "0.1.0+2"
+    version: "0.1.1"
   glob:
     dependency: transitive
     description:
