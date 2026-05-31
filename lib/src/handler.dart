@@ -501,17 +501,17 @@ Handler buildStudioHandler({
       );
     });
 
-    // POST /login/  →  validate credentials, set session cookie
+    // POST /login/  →  validate credentials, issue token cookie
     router.post('/login/', (Request req) async {
       final params = await bodyParams(req);
       final u = params['username']?.trim() ?? '';
       final p = params['password'] ?? '';
 
-      if (u == auth.username && p == auth.password) {
-        final token = auth.createSession();
+      final token = auth.authenticate(u, p);
+      if (token != null) {
         return Response.found(
           '$prefix/',
-          headers: {'set-cookie': auth.setCookieHeader(token)},
+          headers: {'set-cookie': auth.setCookieHeader(token, prefix: prefix)},
         );
       }
 
@@ -526,13 +526,13 @@ Handler buildStudioHandler({
       );
     });
 
-    // POST /logout/  →  destroy session and redirect to login
+    // POST /logout/  →  revoke token and redirect to login
     router.post('/logout/', (Request req) async {
       final token = auth.currentToken(req.headers);
-      if (token != null) auth.destroySession(token);
+      if (token != null) auth.revokeToken(token);
       return Response.found(
         '$prefix/login/',
-        headers: {'set-cookie': auth.clearCookieHeader()},
+        headers: {'set-cookie': auth.clearCookieHeader(prefix: prefix)},
       );
     });
   }

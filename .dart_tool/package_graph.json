@@ -5,8 +5,9 @@
   "packages": [
     {
       "name": "gisila_studio",
-      "version": "0.1.1",
+      "version": "0.2.0",
       "dependencies": [
+        "crypto",
         "gisila_orm",
         "shelf",
         "shelf_router"
@@ -85,6 +86,13 @@
         "postgres",
         "source_span",
         "yaml"
+      ]
+    },
+    {
+      "name": "crypto",
+      "version": "3.0.7",
+      "dependencies": [
+        "typed_data"
       ]
     },
     {
@@ -425,13 +433,6 @@
       "name": "web",
       "version": "1.1.1",
       "dependencies": []
-    },
-    {
-      "name": "crypto",
-      "version": "3.0.7",
-      "dependencies": [
-        "typed_data"
-      ]
     },
     {
       "name": "vm_service",
