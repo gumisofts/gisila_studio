@@ -24,9 +24,9 @@ Future<Database> _db() => Database.connect(DatabaseConfig(connections: [
     ]));
 
 Future<Response> _get(GisilaStudio studio, String path) async =>
-    await studio.handler(prefix: '/studio')(
-        Request('GET', Uri.parse('http://localhost/studio$path'),
-            handlerPath: '/studio/'));
+    await studio.handler(prefix: '/studio')(Request(
+        'GET', Uri.parse('http://localhost/studio$path'),
+        handlerPath: '/studio/'));
 
 void main() {
   group('credentialWeakness', () {
@@ -51,8 +51,9 @@ void main() {
     });
 
     test('strategies report their own weakness', () {
-      expect(SessionStudioAuth(username: 'a', password: 'admin')
-          .weaknessReason(), isNotNull);
+      expect(
+          SessionStudioAuth(username: 'a', password: 'admin').weaknessReason(),
+          isNotNull);
       expect(
           JwtStudioAuth(username: 'a', password: _goodPassword, secret: 'x')
               .weaknessReason(),
@@ -80,8 +81,7 @@ void main() {
     });
 
     test('weak credentials → disabled', () async {
-      final studio =
-          GisilaStudio(db: db, username: 'admin', password: 'admin');
+      final studio = GisilaStudio(db: db, username: 'admin', password: 'admin');
       expect((await _get(studio, '/login/')).statusCode, 503);
     });
 
@@ -93,7 +93,10 @@ void main() {
 
     test('strong credentials → login page', () async {
       final studio = GisilaStudio(
-          db: db, username: 'admin', password: _goodPassword, secret: _goodSecret);
+          db: db,
+          username: 'admin',
+          password: _goodPassword,
+          secret: _goodSecret);
       final res = await _get(studio, '/login/');
       expect(res.statusCode, 200);
       expect(await res.readAsString(), contains('Log in to'));
@@ -114,7 +117,10 @@ void main() {
 
     test('a secret switches the shorthand to JWT auth', () async {
       final studio = GisilaStudio(
-          db: db, username: 'admin', password: _goodPassword, secret: _goodSecret);
+          db: db,
+          username: 'admin',
+          password: _goodPassword,
+          secret: _goodSecret);
       final res = await studio.handler(prefix: '/studio')(Request(
           'POST', Uri.parse('http://localhost/studio/login/'),
           handlerPath: '/studio/',

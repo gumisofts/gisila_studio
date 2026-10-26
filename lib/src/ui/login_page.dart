@@ -61,7 +61,8 @@ String renderLoginPage({
 
 /// The page served instead of the studio when it refuses to run with an
 /// insecure setup. The reason goes to the server log, not to the visitor.
-String renderDisabledPage({required String prefix, required String studioTitle}) =>
+String renderDisabledPage(
+        {required String prefix, required String studioTitle}) =>
     '''<!DOCTYPE html>
 <html lang="en">
 <head>
