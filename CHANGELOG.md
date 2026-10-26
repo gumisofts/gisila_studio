@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Security (breaking): the studio no longer runs without a login. With no
+  credentials, or weak ones (password under 12 characters, equal to the
+  username or a placeholder; JWT signing secret under 32 characters), it
+  serves a "Studio is disabled" page (503) and logs why to stderr; the rest
+  of the app keeps running. Opt out with `allowUnauthenticated: true` (no
+  login, dev only) or `allowInsecure: true` / `GISILA_ALLOW_INSECURE=1`
+  (weak credentials, with a warning). `StudioAuth.weaknessReason()` lets
+  custom strategies join in; `credentialWeakness` and `secretWeakness` are
+  exported.
+- Auth: the constructor takes `secret` (or `STUDIO_SECRET`); with it the
+  username/password shorthand builds a `JwtStudioAuth`, which works across
+  isolates, instead of the per-isolate `SessionStudioAuth`.
+- Tests: first test suite (`test/studio_auth_test.dart`).
 - Security: columns holding secrets no longer show up in the studio. The
   delete page's record summary and the default list view (no
   `listDisplay`) skip `passwordFields`, and `register()` now accepts
