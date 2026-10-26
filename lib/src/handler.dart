@@ -409,21 +409,17 @@ Handler buildStudioHandler({
         .join('\n');
 
     final body = '''
-      <div class="page-hdr">
-        <div class="page-title">Delete ${_esc(admin.displayName)}?</div>
-        <div class="page-meta">This action is permanent and cannot be undone.</div>
-      </div>
-      <div class="del-panel">
-        <div class="del-ic">
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+      <div class="dialog" role="alertdialog" aria-labelledby="del-title">
+        <div class="dialog-body">
+          <div class="dialog-label">${_esc(admin.displayName)}</div>
+          <h2 id="del-title">Delete this record?</h2>
+          <p>The record below will be permanently removed from the database. This cannot be undone.</p>
+          <div class="code-snippet">$rowSummary</div>
         </div>
-        <h2>${_esc(admin.displayName)} will be deleted</h2>
-        <p>The following record will be permanently removed from the database.</p>
-        <div class="del-record">$rowSummary</div>
-        <div class="del-actions">
+        <div class="btn-set">
           <a class="btn btn-secondary" href="$prefix/$table/${Uri.encodeComponent(pk)}/change/">Cancel</a>
           <form method="post" action="$prefix/$table/${Uri.encodeComponent(pk)}/delete/" style="display:contents">
-            <button class="btn btn-danger" type="submit">Delete permanently</button>
+            <button class="btn btn-danger" type="submit">Delete</button>
           </form>
         </div>
       </div>''';

@@ -2,6 +2,7 @@
 library gisila_studio.ui.dashboard;
 
 import '../model_admin.dart';
+import 'icons.dart';
 import 'layout.dart';
 
 /// Renders the dashboard overview.
@@ -17,13 +18,11 @@ String renderDashboard({
       title: 'Overview',
       body: '''
         <div class="page-hdr">
-          <div class="page-title">Overview</div>
+          <h1 class="page-title">Overview</h1>
         </div>
-        <div class="table-card">
+        <div class="data-table-container">
           <div class="empty-state">
-            <div class="empty-icon">
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-            </div>
+            ${icon('data-table', size: 64)}
             <h3>No collections registered</h3>
             <p>Call <code>studio.register()</code> to add models.</p>
           </div>
@@ -62,30 +61,28 @@ String renderDashboard({
   final sections = order.map((g) {
     final tiles = groups[g]!.map((a) {
       final count = counts[a.meta.tableName] ?? 0;
-      final initial =
-          a.displayName.isNotEmpty ? a.displayName[0].toUpperCase() : '?';
       return '''
-        <a class="model-tile" href="$prefix/${a.meta.tableName}/">
-          <div class="model-tile-ic">$initial</div>
+        <a class="tile-clickable" href="$prefix/${a.meta.tableName}/">
           <div>
-            <div class="model-tile-name">${_esc(a.displayNamePlural)}</div>
-            <div class="model-tile-count">${_fmt(count)} records</div>
+            <div class="tile-name">${_esc(a.displayNamePlural)}</div>
+            <div class="tile-count">${_fmt(count)} ${count == 1 ? 'record' : 'records'}</div>
           </div>
+          ${icon('arrow-right')}
         </a>''';
     }).join('\n');
     return '''
-      <div class="section-lbl">${_esc(g)}</div>
-      <div class="model-grid">$tiles</div>''';
+      <h2 class="section-lbl">${_esc(g)}</h2>
+      <div class="tile-grid">$tiles</div>''';
   }).join('\n');
 
   final body = '''
-    <div class="dash-hero">
-      <h1>Welcome back</h1>
-      <p>Your content at a glance. Select a collection from the sidebar to browse and manage records.</p>
-      <div class="dash-kpis">
-        <div><div class="kpi-val">${admins.length}</div><div class="kpi-lbl">Collections</div></div>
-        <div><div class="kpi-val">${_fmt(totalRecords)}</div><div class="kpi-lbl">Total records</div></div>
-      </div>
+    <div class="page-hdr">
+      <h1 class="page-title">Overview</h1>
+      <p class="page-meta">Choose a collection to browse and manage its records.</p>
+    </div>
+    <div class="kpi-row">
+      <div class="kpi"><div class="kpi-lbl">Collections</div><div class="kpi-val">${admins.length}</div></div>
+      <div class="kpi"><div class="kpi-lbl">Total records</div><div class="kpi-val">${_fmt(totalRecords)}</div></div>
     </div>
     $sections''';
 
