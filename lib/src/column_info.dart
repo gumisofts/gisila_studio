@@ -56,53 +56,63 @@ class ColumnInfo {
     }
   }
 
-  /// Convert a raw form string value to the Dart/Postgres type for this column.
+  /// Returned by [parseFormValue] for a blank field on a NOT NULL column
+  /// that has a database default: leave the column out of the write so the
+  /// default (or, on edit, the stored value) applies.
+  static const Object useDefault = _UseDefault();
+
+  /// Convert a raw form string value to the Dart/Postgres type for this
+  /// column. Throws [FormatException] (with a message meant for the form)
+  /// when the value doesn't parse, or when a required field is blank.
   Object? parseFormValue(String? raw) {
-    if (raw == null || raw.isEmpty) return isNullable ? null : _defaultFor();
+    if (dataType == 'boolean') {
+      // An unchecked checkbox sends nothing.
+      return raw == 'on' || raw == 'true' || raw == '1';
+    }
+    if (raw == null || raw.isEmpty) {
+      if (isNullable) return null;
+      if (columnDefault != null) return useDefault;
+      if (_isText) return '';
+      throw const FormatException('This field is required.');
+    }
+    Object? parsed;
     switch (dataType) {
       case 'integer':
       case 'bigint':
       case 'smallint':
       case 'serial':
       case 'bigserial':
-        return int.tryParse(raw);
+        parsed = int.tryParse(raw.trim());
+        if (parsed == null) {
+          throw const FormatException('Enter a whole number.');
+        }
       case 'real':
       case 'double precision':
       case 'numeric':
       case 'decimal':
-        return double.tryParse(raw);
-      case 'boolean':
-        return raw == 'on' || raw == 'true' || raw == '1';
+        parsed = double.tryParse(raw.trim());
+        if (parsed == null) throw const FormatException('Enter a number.');
       case 'date':
-        return DateTime.tryParse(raw);
       case 'timestamp without time zone':
       case 'timestamp with time zone':
-        return DateTime.tryParse(raw);
+        parsed = DateTime.tryParse(raw.trim());
+        if (parsed == null) {
+          throw const FormatException('Enter a valid date and time.');
+        }
       default:
-        return raw;
+        parsed = raw;
     }
+    return parsed;
   }
 
-  Object? _defaultFor() {
-    switch (dataType) {
-      case 'integer':
-      case 'bigint':
-      case 'smallint':
-        return 0;
-      case 'real':
-      case 'double precision':
-      case 'numeric':
-        return 0.0;
-      case 'boolean':
-        return false;
-      case 'timestamp without time zone':
-      case 'timestamp with time zone':
-      case 'date':
-        return DateTime.now().toUtc();
-      default:
-        return '';
-    }
-  }
+  bool get _isText => const {
+        'text',
+        'character varying',
+        'character',
+        'varchar',
+        'char',
+        'citext',
+      }.contains(dataType);
 
   /// Format a raw DB value for display in the admin list/form.
   String display(Object? value) {
@@ -168,3 +178,7 @@ ORDER BY ordinal_position
 
 /// Invalidate the column cache (useful in tests).
 void clearColumnCache() => _columnCache.clear();
+
+class _UseDefault {
+  const _UseDefault();
+}

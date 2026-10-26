@@ -307,7 +307,8 @@ String? secretWeakness(String secret) {
   if (secret.length < minStudioSecretLength) {
     return 'the signing secret is shorter than $minStudioSecretLength characters';
   }
-  if (_isPlaceholder(secret)) return 'the signing secret is a placeholder value';
+  if (_isPlaceholder(secret))
+    return 'the signing secret is a placeholder value';
   return null;
 }
 
