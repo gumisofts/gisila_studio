@@ -99,7 +99,7 @@
     },
     {
       "name": "gisila_studio",
-      "version": "0.1.0+2",
+      "version": "0.1.1",
       "dependencies": [
         "gisila_orm",
         "shelf",
@@ -108,7 +108,7 @@
     },
     {
       "name": "gisila_orm",
-      "version": "0.0.1+10",
+      "version": "0.1.1",
       "dependencies": [
         "args",
         "build",

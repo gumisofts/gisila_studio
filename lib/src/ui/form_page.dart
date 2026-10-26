@@ -3,6 +3,7 @@ library gisila_studio.ui.form_page;
 
 import '../column_info.dart';
 import '../model_admin.dart';
+import 'icons.dart';
 import 'layout.dart';
 
 /// Renders the add or edit form for a model.
@@ -59,36 +60,36 @@ String renderFormPage({
       ? 'Fill in the details to create a new ${admin.displayName.toLowerCase()}.'
       : 'Update the fields below and save your changes.';
 
-  final deleteMeta = !isAdd
-      ? '<a class="form-footer-link danger" href="$prefix/$table/${Uri.encodeComponent(pkValue!)}/delete/">Delete this record</a>'
+  final deleteLink = !isAdd
+      ? '<a class="btn btn-danger-ghost btn-md" href="$prefix/$table/${Uri.encodeComponent(pkValue!)}/delete/">Delete ${_esc(admin.displayName.toLowerCase())}${icon('trash')}</a>'
       : '';
 
-  final extraAction = isAdd
-      ? '<a class="form-footer-link" href="#" onclick="document.getElementById(\'_act\').value=\'save_add\';document.getElementById(\'rec-form\').submit();return false">save and create another</a>'
-      : '<a class="form-footer-link" href="#" onclick="document.getElementById(\'_act\').value=\'save_continue\';document.getElementById(\'rec-form\').submit();return false">save and keep editing</a>';
+  final (extraValue, extraLabel) = isAdd
+      ? ('save_add', 'Save and add another')
+      : ('save_continue', 'Save and keep editing');
 
   final body = '''
     <div class="page-hdr">
-      <div class="page-title">${_esc(pageTitle)}</div>
-      <div class="page-meta">$subtitle</div>
+      <h1 class="page-title">${_esc(pageTitle)}</h1>
+      <p class="page-meta">$subtitle</p>
     </div>
 
     <form method="post" action="$formAction" id="rec-form" class="form-wrap">
       <input type="hidden" name="_action" value="save" id="_act">
       <div class="form-card">
-        <div class="form-card-title">${_esc(admin.displayName)} details</div>
-        $fieldBlocks
-      </div>
-
-      <div class="form-footer">
-        <div class="form-footer-left">
-          <a class="btn btn-secondary btn-sm" href="$prefix/$table/">Cancel</a>
-          $deleteMeta
+        <div class="form-card-body">
+          <h2 class="form-card-title">${_esc(admin.displayName)} details</h2>
+          $fieldBlocks
         </div>
-        <div class="form-footer-right">
-          $extraAction
+        <div class="btn-set">
+          <a class="btn btn-secondary" href="$prefix/$table/">Cancel</a>
           <button class="btn btn-primary" type="submit">Save</button>
         </div>
+      </div>
+
+      <div class="form-secondary">
+        <button class="btn btn-ghost btn-md" type="submit" onclick="document.getElementById('_act').value='$extraValue'">$extraLabel</button>
+        $deleteLink
       </div>
     </form>''';
 
@@ -129,8 +130,11 @@ String _buildField({
 
   final req = isRequired ? '<span class="req">*</span>' : '';
   final errorHtml = hasError && errorMsg != null
-      ? '<div class="field-error">${_esc(errorMsg)}</div>'
+      ? '<div class="field-error" id="e_$name">${_esc(errorMsg)}</div>'
       : '';
+
+  final invalid =
+      hasError ? ' aria-invalid="true" aria-describedby="e_$name"' : '';
 
   String inputHtml;
   if (isReadonly) {
@@ -147,12 +151,12 @@ String _buildField({
         '</div>';
   } else if (inputType == 'textarea') {
     inputHtml =
-        '<textarea name="$name" id="f_$name" rows="4">${_esc(prefilledStr)}</textarea>';
+        '<textarea name="$name" id="f_$name" rows="4"$invalid>${_esc(prefilledStr)}</textarea>';
   } else {
     final step = inputType == 'number_decimal' ? ' step="any"' : '';
     final type = inputType == 'number_decimal' ? 'number' : inputType;
     inputHtml = '<input type="$type" name="$name" id="f_$name"'
-        '${isRequired ? ' required' : ''} value="${_esc(prefilledStr)}"$step>';
+        '${isRequired ? ' required' : ''} value="${_esc(prefilledStr)}"$step$invalid>';
   }
 
   // Hint for FK columns
@@ -163,9 +167,11 @@ String _buildField({
   return '''
     <div class="field${hasError ? ' has-error' : ''}">
       <label class="field-lbl" for="f_$name">${_esc(label)}$req</label>
-      $inputHtml
-      $hint
-      $errorHtml
+      <div class="field-input">
+        $inputHtml
+        ${hasError && !isReadonly && inputType != 'checkbox' ? icon('warning-filled', cls: 'field-error-icon') : ''}
+      </div>
+      ${hasError ? errorHtml : hint}
     </div>''';
 }
 

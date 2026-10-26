@@ -95,6 +95,10 @@ class ColumnInfo {
         return 0.0;
       case 'boolean':
         return false;
+      case 'timestamp without time zone':
+      case 'timestamp with time zone':
+      case 'date':
+        return DateTime.now().toUtc();
       default:
         return '';
     }

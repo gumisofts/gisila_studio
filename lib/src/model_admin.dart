@@ -54,6 +54,13 @@ class ModelAdmin<T> {
   /// Normalized to DB column names.
   final List<String> passwordFields;
 
+  /// Columns that should be automatically set to the current UTC timestamp
+  /// whenever a record is saved via the studio (create or update). Typical
+  /// usage is `['updatedAt']` so the field stays in [readonlyFields] (users
+  /// cannot manually edit it) while still being stamped on every save.
+  /// Normalized to DB column names.
+  final List<String> autoNowOnUpdateFields;
+
   /// Number of rows per page in the list view.
   final int pageSize;
 
@@ -75,6 +82,7 @@ class ModelAdmin<T> {
     List<String> readonlyFields = const [],
     List<String> excludeFields = const [],
     List<String> passwordFields = const [],
+    List<String> autoNowOnUpdateFields = const [],
     this.pageSize = 25,
     List<String> ordering = const [],
     this.group,
@@ -90,6 +98,8 @@ class ModelAdmin<T> {
             excludeFields.map((c) => _resolveColumn(c, meta))),
         passwordFields = List.unmodifiable(
             passwordFields.map((c) => _resolveColumn(c, meta))),
+        autoNowOnUpdateFields = List.unmodifiable(
+            autoNowOnUpdateFields.map((c) => _resolveColumn(c, meta))),
         ordering = List.unmodifiable(ordering.map((t) {
           if (t.startsWith('-')) {
             return '-${_resolveColumn(t.substring(1), meta)}';
@@ -132,6 +142,7 @@ ModelAdmin<T> buildModelAdmin<T>(
   List<String> readonlyFields = const [],
   List<String> excludeFields = const [],
   List<String> passwordFields = const [],
+  List<String> autoNowOnUpdateFields = const [],
   int pageSize = 25,
   List<String> ordering = const [],
   String? group,
@@ -146,6 +157,7 @@ ModelAdmin<T> buildModelAdmin<T>(
     readonlyFields: readonlyFields,
     excludeFields: excludeFields,
     passwordFields: passwordFields,
+    autoNowOnUpdateFields: autoNowOnUpdateFields,
     pageSize: pageSize,
     ordering: ordering,
     group: group,

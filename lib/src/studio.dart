@@ -35,10 +35,11 @@ import 'model_admin.dart';
 ///   ordering: ['-published_at'],
 /// );
 ///
-/// // Mount under /studio on your existing router:
-/// router.mount('/studio', studio.handler(prefix: '/studio'));
+/// // Mount under /admin on your existing router
+/// // (prefix must match the mount path):
+/// router.mount('/admin', studio.handler(prefix: '/admin'));
 ///
-/// // Or serve standalone:
+/// // Or serve standalone (no parent router):
 /// await shelf_io.serve(studio.handler(prefix: ''), 'localhost', 8080);
 /// ```
 class GisilaStudio {
@@ -47,32 +48,55 @@ class GisilaStudio {
   /// Title shown in the sidebar header and browser tab.
   final String title;
 
-  /// Auth configuration. When non-null every request is gated behind a login
-  /// form. Credentials are read from [username] / [password], which default to
-  /// the `STUDIO_USERNAME` / `STUDIO_PASSWORD` environment variables.
+  /// Auth strategy. When non-null every request is gated behind a login form.
+  ///
+  /// Pass a [JwtStudioAuth] for stateless JWT authentication or a
+  /// [SessionStudioAuth] for server-side session tokens.  When omitted the
+  /// convenience [username] / [password] parameters (or their corresponding
+  /// `STUDIO_USERNAME` / `STUDIO_PASSWORD` env vars) are used to build a
+  /// [SessionStudioAuth] automatically.
   final StudioAuth? _auth;
 
   final List<ModelAdmin<dynamic>> _admins = [];
 
   /// Creates a [GisilaStudio] instance.
   ///
-  /// If [username] and [password] are both provided (or found in the
-  /// environment variables `STUDIO_USERNAME` and `STUDIO_PASSWORD`), a login
-  /// form is required before accessing any page.  If neither env var is set and
-  /// no explicit credentials are passed, the studio runs without authentication.
+  /// **Auth options (pick one):**
+  ///
+  /// 1. Pass a fully configured [auth] strategy — [JwtStudioAuth] or a custom
+  ///    [StudioAuth] implementation.
+  ///
+  /// ```dart
+  /// GisilaStudio(
+  ///   db: db,
+  ///   auth: JwtStudioAuth(
+  ///     username: 'admin',
+  ///     password: 's3cr3t',
+  ///     secret: Platform.environment['JWT_SECRET']!,
+  ///   ),
+  /// )
+  /// ```
+  ///
+  /// 2. Use the shorthand [username] / [password] parameters (or the env vars
+  ///    `STUDIO_USERNAME` / `STUDIO_PASSWORD`) which create a
+  ///    [SessionStudioAuth] for you.
+  ///
+  /// If neither option is configured the studio runs without authentication
+  /// (suitable for local development only).
   GisilaStudio({
     required Database db,
     this.title = 'Gisila Studio',
+    StudioAuth? auth,
     String? username,
     String? password,
   })  : _db = db,
-        _auth = _buildAuth(username, password);
+        _auth = auth ?? _buildSessionAuth(username, password);
 
-  static StudioAuth? _buildAuth(String? username, String? password) {
+  static StudioAuth? _buildSessionAuth(String? username, String? password) {
     final u = username ?? Platform.environment['STUDIO_USERNAME'];
     final p = password ?? Platform.environment['STUDIO_PASSWORD'];
     if (u != null && u.isNotEmpty && p != null && p.isNotEmpty) {
-      return StudioAuth(username: u, password: p);
+      return SessionStudioAuth(username: u, password: p);
     }
     return null;
   }
@@ -90,6 +114,10 @@ class GisilaStudio {
   /// * [searchFields] — columns to `ILIKE` search against.
   /// * [readonlyFields] — columns shown on forms but not editable.
   /// * [excludeFields] — columns completely hidden from forms.
+  /// * [autoNowOnUpdateFields] — columns automatically stamped with the current
+  ///   UTC timestamp on every save (create or update). Typically used together
+  ///   with [readonlyFields] so the user cannot edit the value manually while
+  ///   the studio still keeps it up-to-date, e.g. `['updatedAt']`.
   /// * [pageSize] — rows per page (default 25).
   /// * [ordering] — default list ordering; prefix with `-` for DESC,
   ///   e.g. `['-date_joined', 'email']`.
@@ -101,6 +129,7 @@ class GisilaStudio {
     List<String> searchFields = const [],
     List<String> readonlyFields = const [],
     List<String> excludeFields = const [],
+    List<String> autoNowOnUpdateFields = const [],
     int pageSize = 25,
     List<String> ordering = const [],
     String? group,
@@ -113,6 +142,7 @@ class GisilaStudio {
       searchFields: searchFields,
       readonlyFields: readonlyFields,
       excludeFields: excludeFields,
+      autoNowOnUpdateFields: autoNowOnUpdateFields,
       pageSize: pageSize,
       ordering: ordering,
       group: group,
@@ -122,12 +152,16 @@ class GisilaStudio {
   /// Build the Shelf [Handler] for the admin interface.
   ///
   /// [prefix] must match the URL path where the handler is mounted so that
-  /// all internal links are generated correctly. For example, if you mount
-  /// at `/admin`, pass `prefix: '/admin'`.
+  /// all internal links are generated correctly.
   ///
-  /// When serving standalone (not mounted under a parent router), pass an
-  /// empty string: `prefix: ''`.
-  Handler handler({String prefix = '/studio'}) {
+  /// ```dart
+  /// // Mounted under /admin:
+  /// router.mount('/admin', studio.handler(prefix: '/admin'));
+  ///
+  /// // Standalone (no parent router):
+  /// await shelf_io.serve(studio.handler(prefix: ''), 'localhost', 8080);
+  /// ```
+  Handler handler({required String prefix}) {
     // Normalise: no trailing slash.
     final p =
         prefix.endsWith('/') ? prefix.substring(0, prefix.length - 1) : prefix;

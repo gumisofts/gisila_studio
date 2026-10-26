@@ -1,14 +1,15 @@
-/// Base HTML layout for Gisila Studio pages.
+/// Base HTML layout for Gisila Studio pages, built on the Carbon UI shell.
 library gisila_studio.ui.layout;
 
 import '../model_admin.dart';
+import 'icons.dart';
 import 'theme.dart';
 
-/// Wraps [body] in the full page shell: sidebar + topbar + content.
+/// Wraps [body] in the full page shell: header + side nav + content.
 ///
-/// [topbarBreadcrumbs] renders the breadcrumb trail in the sticky topbar.
-/// [topbarRight] renders action buttons in the topbar right slot.
-/// [showLogout] controls whether a logout button appears in the sidebar footer.
+/// [topbarBreadcrumbs] renders the breadcrumb trail above the page.
+/// [topbarRight] renders action buttons at the right of the breadcrumb row.
+/// [showLogout] controls whether a sign-out action appears in the header.
 String renderLayout({
   required String title,
   required String body,
@@ -28,68 +29,79 @@ String renderLayout({
     modelCounts: modelCounts,
     activeTable: activeTable,
     prefix: prefix,
-    studioTitle: studioTitle,
-    showLogout: showLogout,
   );
 
-  final bcItems = [
-    '<a href="$prefix/">Studio</a>',
-    ...topbarBreadcrumbs.map((b) {
-      final (label, url) = b;
-      if (url != null) {
-        return '<span class="sep">›</span><a href="$url">${_esc(label)}</a>';
-      }
-      return '<span class="sep">›</span><span class="crumb-current">${_esc(label)}</span>';
-    }),
-  ];
-  if (topbarBreadcrumbs.isEmpty) {
-    bcItems.clear();
-    bcItems.add('<span class="crumb-current">Overview</span>');
-  }
-  final bcHtml = bcItems.join(' ');
+  final crumbs = topbarBreadcrumbs.isEmpty
+      ? ''
+      : [
+          '<li class="breadcrumb-item"><a href="$prefix/">Overview</a></li>',
+          ...topbarBreadcrumbs.map((b) {
+            final (label, url) = b;
+            return url != null
+                ? '<li class="breadcrumb-item"><a href="$url">${_esc(label)}</a></li>'
+                : '<li class="breadcrumb-item" aria-current="page">${_esc(label)}</li>';
+          }),
+        ].join();
+  final breadcrumbRow = crumbs.isEmpty && topbarRight == null
+      ? ''
+      : '''
+      <div class="breadcrumb-row">
+        <nav aria-label="Breadcrumb"><ol class="breadcrumb">$crumbs</ol></nav>
+        ${topbarRight != null ? '<div class="breadcrumb-actions">$topbarRight</div>' : ''}
+      </div>''';
 
   final flashHtml = flashMessage != null
       ? '''
-        <div class="toast ${flashIsError ? 'toast-err' : 'toast-ok'}" id="studio-toast">
-          <span class="toast-dot"></span>
-          <span>${_esc(flashMessage)}</span>
-          <button type="button" class="toast-dismiss" onclick="this.parentElement.remove()" aria-label="Dismiss">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+        <div class="notification ${flashIsError ? 'notification-error' : 'notification-success'}" id="studio-toast" role="status">
+          ${icon(flashIsError ? 'error-filled' : 'checkmark-filled', size: 20)}
+          <div><span class="notification-title">${flashIsError ? 'Error' : 'Success'}</span>${_esc(flashMessage)}</div>
+          <button type="button" class="notification-close" onclick="this.parentElement.remove()" aria-label="Close notification">
+            ${icon('close')}
           </button>
         </div>'''
       : '';
+
+  final name = studioTitle ?? 'Gisila Studio';
 
   return '''<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>${_esc(title)} — ${_esc(studioTitle ?? 'Gisila Studio')}</title>
+  <title>${_esc(title)} — ${_esc(name)}</title>
   <style>$studioStyles</style>
 </head>
 <body>
-  $sidebar
+  ${renderHeader(prefix: prefix, studioTitle: name, showLogout: showLogout, withMenu: true)}
 
-  <div class="main-wrap">
-    <header class="topbar">
-      <div class="breadcrumb">$bcHtml</div>
-      ${topbarRight != null ? '<div class="topbar-actions">$topbarRight</div>' : ''}
-    </header>
-    <main class="content">
-      $flashHtml
-      $body
-    </main>
-  </div>
+  $sidebar
+  <div class="side-nav-overlay" id="side-nav-overlay"></div>
+
+  <main class="content">
+    $breadcrumbRow
+    $flashHtml
+    $body
+  </main>
 
   <script>
-    // Sidebar nav filter
+    // Side nav drawer on small screens
+    const sideNav = document.getElementById('side-nav');
+    const menuToggle = document.getElementById('menu-toggle');
+    function _setNav(open) {
+      sideNav.classList.toggle('expanded', open);
+      menuToggle.setAttribute('aria-expanded', open);
+    }
+    menuToggle.addEventListener('click', () => _setNav(!sideNav.classList.contains('expanded')));
+    document.getElementById('side-nav-overlay').addEventListener('click', () => _setNav(false));
+
+    // Side nav filter
     const navInput = document.getElementById('nav-filter');
     if (navInput) {
       navInput.addEventListener('input', () => {
         const q = navInput.value.toLowerCase().trim();
-        document.querySelectorAll('.nav-group').forEach(g => {
+        document.querySelectorAll('.side-nav-group').forEach(g => {
           let visible = 0;
-          g.querySelectorAll('.nav-item').forEach(a => {
+          g.querySelectorAll('.side-nav-link').forEach(a => {
             const match = !q || a.textContent.toLowerCase().includes(q);
             a.classList.toggle('nav-hidden', !match);
             if (match) visible++;
@@ -120,12 +132,15 @@ String renderLayout({
     });
 
     function _updateSelBar() {
+      document.querySelectorAll('.row-cb').forEach(cb =>
+        cb.closest('tr').classList.toggle('selected', cb.checked));
       const bar = document.getElementById('sel-bar');
       if (!bar) return;
       const count = document.querySelectorAll('.row-cb:checked').length;
       bar.classList.toggle('visible', count > 0);
+      bar.setAttribute('aria-hidden', count === 0);
       const lbl = bar.querySelector('.sel-count');
-      if (lbl) lbl.textContent = count + (count === 1 ? ' selected' : ' selected');
+      if (lbl) lbl.textContent = count + (count === 1 ? ' item selected' : ' items selected');
     }
 
     const clearSel = document.getElementById('clear-sel');
@@ -145,19 +160,51 @@ String renderLayout({
       });
     });
 
-    // Auto-dismiss toast
-    const toast = document.getElementById('studio-toast');
-    if (toast) setTimeout(() => { toast.style.transition = 'opacity .4s'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 400); }, 4000);
+    // Auto-dismiss success notifications
+    const toast = document.querySelector('.notification-success');
+    if (toast) setTimeout(() => { toast.style.transition = 'opacity .24s'; toast.style.opacity = '0'; setTimeout(() => toast.remove(), 240); }, 5000);
   </script>
 </body>
 </html>''';
+}
+
+/// The Carbon UI shell header. [withMenu] adds the hamburger that opens the
+/// side nav on small screens.
+String renderHeader({
+  required String prefix,
+  required String studioTitle,
+  bool showLogout = false,
+  bool withMenu = false,
+}) {
+  final name = studioTitle.startsWith('Gisila ')
+      ? '<span class="header-name-prefix">Gisila</span>'
+          '${_esc(studioTitle.substring(7))}'
+      : _esc(studioTitle);
+  final menu = withMenu
+      ? '''
+    <button type="button" class="header-menu-btn" id="menu-toggle" aria-label="Open menu" aria-controls="side-nav" aria-expanded="false">
+      ${icon('menu', size: 20)}
+    </button>'''
+      : '';
+  final logout = showLogout
+      ? '''
+    <div class="header-global">
+      <form method="post" action="$prefix/logout/" style="display:contents">
+        <button type="submit" class="header-action" aria-label="Sign out" title="Sign out">${icon('logout', size: 20)}</button>
+      </form>
+    </div>'''
+      : '';
+  return '''
+  <header class="shell-header" aria-label="${_esc(studioTitle)}">$menu
+    <a class="header-name" href="$prefix/">$name</a>$logout
+  </header>''';
 }
 
 /// Parses a `?_msg=` query param into a flash message.
 (String? message, bool isError) parseFlashMessage(String? msg) {
   switch (msg) {
     case 'added':
-      return ('Record created successfully.', false);
+      return ('Record created.', false);
     case 'saved':
       return ('Changes saved.', false);
     case 'deleted':
@@ -173,9 +220,7 @@ String _renderSidebar({
   required List<ModelAdmin<dynamic>> admins,
   required Map<String, int> modelCounts,
   required String prefix,
-  String? studioTitle,
   String? activeTable,
-  bool showLogout = false,
 }) {
   final groups = <String, List<ModelAdmin<dynamic>>>{};
   for (final a in admins) {
@@ -202,56 +247,38 @@ String _renderSidebar({
     final items = groups[g]!.map((a) {
       final isActive = a.meta.tableName == activeTable;
       final count = modelCounts[a.meta.tableName];
-      final badge =
-          count != null ? '<span class="nav-badge">${_fmt(count)}</span>' : '';
+      final badge = count != null
+          ? '<span class="side-nav-count">${_fmt(count)}</span>'
+          : '';
       return '''
-        <a class="nav-item${isActive ? ' active' : ''}" href="$prefix/${a.meta.tableName}/">
-          ${_esc(a.displayNamePlural)}$badge
+        <a class="side-nav-link${isActive ? ' active' : ''}" href="$prefix/${a.meta.tableName}/"${isActive ? ' aria-current="page"' : ''}>
+          <span>${_esc(a.displayNamePlural)}</span>$badge
         </a>''';
     }).join('\n');
     return '''
-      <div class="nav-group">
-        <div class="nav-group-label">${_esc(g)}</div>
+      <div class="side-nav-group">
+        <div class="side-nav-group-label">${_esc(g)}</div>
         $items
       </div>''';
   }).join('\n');
 
-  final initial = (studioTitle ?? 'Gisila Studio').isNotEmpty
-      ? (studioTitle ?? 'Gisila Studio')[0].toUpperCase()
-      : 'G';
-
   return '''
-  <aside class="sidebar">
-    <a class="sidebar-logo" href="$prefix/">
-      <div class="logo-mark">$initial</div>
-      <div>
-        <div class="logo-name">${_esc(studioTitle ?? 'Gisila Studio')}</div>
-        <div class="logo-sub">Content studio</div>
-      </div>
-    </a>
-    <div class="sidebar-search">
-      <div class="sidebar-search-inner">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-        <input type="search" id="nav-filter" placeholder="Search collections…" autocomplete="off">
+  <nav class="side-nav" id="side-nav" aria-label="Collections">
+    <div class="side-nav-search">
+      <div class="toolbar-search">
+        ${icon('search')}
+        <input type="search" id="nav-filter" class="side-nav-filter" placeholder="Filter collections" autocomplete="off" aria-label="Filter collections">
       </div>
     </div>
-    <div class="sidebar-body">
+    <div class="side-nav-items">
       $groupsHtml
     </div>
-    <div class="sidebar-footer">
-      <a href="$prefix/">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
-        Overview
+    <div class="side-nav-footer">
+      <a class="side-nav-link${activeTable == null ? ' active' : ''}" href="$prefix/">
+        ${icon('dashboard')}<span>Overview</span>
       </a>
-      ${showLogout ? '''
-      <form method="post" action="$prefix/logout/" style="display:contents">
-        <button type="submit" class="sidebar-logout">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Sign out
-        </button>
-      </form>''' : ''}
     </div>
-  </aside>''';
+  </nav>''';
 }
 
 String _esc(String s) => s

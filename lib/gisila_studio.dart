@@ -15,10 +15,11 @@
 ///   readonlyFields: ['id', 'date_joined'],
 /// );
 ///
-/// // Mount at /studio (or any path)
-/// router.mount('/studio', studio.handler(prefix: '/studio'));
+/// // prefix must match the mount path
+/// router.mount('/admin', studio.handler(prefix: '/admin'));
 /// ```
 library gisila_studio;
 
+export 'src/auth.dart';
 export 'src/model_admin.dart';
 export 'src/studio.dart';
