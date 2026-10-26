@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+- Forms: a value that doesn't parse (letters in a number field, a bad
+  date) is now a field error (422) instead of being saved as NULL. A blank
+  NOT NULL field uses the column's database default when it has one (on
+  edit: keeps the stored value) and is otherwise "This field is required."
+  for non-text columns; it used to be saved as `0`, `0.0` or the current
+  time. Nullable fields still save NULL and an unchecked checkbox `false`.
+- Lists: `page=0` or a negative page shows the first page (it was a 500
+  from a negative OFFSET).
+- Sidebar/overview counts: a table Postgres estimates at 100,000 rows or
+  more shows the planner estimate (`pg_class.reltuples`) instead of a
+  `COUNT(*)` scan on every page view; smaller tables stay exact.
+- Tests: `test/column_info_test.dart`, and `test/studio_crud_test.dart`
+  against Postgres on localhost:5454 (skipped when it isn't running).
 - Security (breaking): the studio no longer runs without a login. With no
   credentials, or weak ones (password under 12 characters, equal to the
   username or a placeholder; JWT signing secret under 32 characters), it

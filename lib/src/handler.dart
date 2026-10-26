@@ -1,6 +1,8 @@
 /// Shelf route handlers for Gisila Studio.
 library gisila_studio.handler;
 
+import 'dart:math' show max;
+
 import 'package:gisila_orm/gisila.dart';
 import 'package:shelf/shelf.dart';
 import 'package:shelf_router/shelf_router.dart';
@@ -28,10 +30,38 @@ Handler buildStudioHandler({
 
   DbContext newCtx() => db.context();
 
+  /// Row counts for the sidebar and overview, fetched on every page. Small
+  /// tables get an exact COUNT(*); a table Postgres estimates (from
+  /// `pg_class.reltuples`, kept by ANALYZE/autovacuum) at
+  /// [_exactCountLimit] rows or more shows that estimate instead, so a big
+  /// table doesn't cost a full scan per page view.
   Future<Map<String, int>> fetchCounts() async {
     final counts = <String, int>{};
     final c = newCtx();
+    final estimates = <String, int>{};
+    try {
+      final result = await c.execute(
+        'SELECT t AS name, cls.reltuples::bigint AS est '
+        'FROM unnest(\$1::text[]) AS t '
+        'LEFT JOIN pg_class cls ON cls.oid = to_regclass(quote_ident(t))',
+        parameters: [
+          [for (final a in admins) a.meta.tableName],
+        ],
+      );
+      for (final row in result) {
+        final m = row.toColumnMap();
+        final est = m['est'];
+        if (est is num) estimates[m['name'] as String] = est.toInt();
+      }
+    } catch (_) {
+      // Fall back to exact counts below.
+    }
     for (final a in admins) {
+      final estimate = estimates[a.meta.tableName] ?? -1;
+      if (estimate >= _exactCountLimit) {
+        counts[a.meta.tableName] = estimate;
+        continue;
+      }
       try {
         final result = await c.execute(
           'SELECT COUNT(*)::bigint AS c FROM "${a.meta.tableName}"',
@@ -113,7 +143,8 @@ Handler buildStudioHandler({
     final params = qparams(req);
     final rawQ = params['q']?.trim();
     final searchQuery = (rawQ?.isEmpty ?? true) ? null : rawQ;
-    final page = int.tryParse(params['page'] ?? '1') ?? 1;
+    // page=0 or a negative page would give a negative OFFSET (a 500).
+    final page = max(1, int.tryParse(params['page'] ?? '1') ?? 1);
     final offset = (page - 1) * admin.pageSize;
 
     final colInfos = await fetchColumns(table);
@@ -205,9 +236,10 @@ Handler buildStudioHandler({
       final rawVal = params[colName];
 
       try {
-        values[colName] = info == null ? rawVal : info.parseFormValue(rawVal);
-      } catch (_) {
-        errors[colName] = 'Invalid value: $rawVal';
+        final value = info == null ? rawVal : info.parseFormValue(rawVal);
+        if (!identical(value, ColumnInfo.useDefault)) values[colName] = value;
+      } on FormatException catch (e) {
+        errors[colName] = e.message;
       }
     }
 
@@ -325,9 +357,10 @@ Handler buildStudioHandler({
       }
 
       try {
-        values[colName] = info == null ? rawVal : info.parseFormValue(rawVal);
-      } catch (_) {
-        errors[colName] = 'Invalid value: $rawVal';
+        final value = info == null ? rawVal : info.parseFormValue(rawVal);
+        if (!identical(value, ColumnInfo.useDefault)) values[colName] = value;
+      } on FormatException catch (e) {
+        errors[colName] = e.message;
       }
     }
 
@@ -567,7 +600,12 @@ Handler buildStudioHandler({
 
 // ── SQL helpers ──────────────────────────────────────────────────────────────
 
+/// Tables estimated at this many rows or more show the estimate in the
+/// sidebar instead of an exact count.
+const _exactCountLimit = 100000;
+
 String _buildInsertSql(String table, Map<String, Object?> values) {
+  if (values.isEmpty) return 'INSERT INTO "$table" DEFAULT VALUES RETURNING *';
   final cols = values.keys.map((c) => '"$c"').join(', ');
   final placeholders =
       values.keys.indexed.map((e) => '\$${e.$1 + 1}').join(', ');
