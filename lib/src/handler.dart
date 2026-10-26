@@ -318,6 +318,11 @@ Handler buildStudioHandler({
 
       final info = colMap[colName];
       final rawVal = params[colName];
+      // Password inputs are never pre-filled, so blank means "keep".
+      if (admin.passwordFields.contains(colName) &&
+          (rawVal == null || rawVal.isEmpty)) {
+        continue;
+      }
 
       try {
         values[colName] = info == null ? rawVal : info.parseFormValue(rawVal);
@@ -404,6 +409,7 @@ Handler buildStudioHandler({
     final counts = await fetchCounts();
 
     final rowSummary = row.entries
+        .where((e) => !admin.passwordFields.contains(e.key))
         .take(5)
         .map((e) => '${_esc(e.key)}: ${_esc(e.value?.toString() ?? '—')}')
         .join('\n');

@@ -48,6 +48,12 @@ abstract class StudioAuth {
   ///
   /// [prefix] must match the value used when the cookie was set.
   String clearCookieHeader({String prefix = ''});
+
+  /// Why this strategy's credentials are too weak to put in front of a
+  /// database, or `null` when they are acceptable. [GisilaStudio] refuses to
+  /// serve while this is non-null unless `allowInsecure` is set. Custom
+  /// strategies return `null` unless they override it.
+  String? weaknessReason() => null;
 }
 
 // ── Session-based auth ────────────────────────────────────────────────────────
@@ -58,8 +64,10 @@ abstract class StudioAuth {
 /// `Set<String>`. The same token is placed in an HttpOnly cookie so every
 /// subsequent request is validated by a simple set look-up.
 ///
-/// Sessions are lost when the server process restarts. Use [JwtStudioAuth]
-/// for a stateless alternative that survives restarts.
+/// Sessions live in this isolate's memory: they are lost on restart, and a
+/// server that runs several isolates (e.g. `shared: true` on one port) will
+/// accept a session only on the isolate that issued it. Use [JwtStudioAuth]
+/// in those setups.
 class SessionStudioAuth extends StudioAuth {
   final String username;
   final String password;
@@ -82,6 +90,9 @@ class SessionStudioAuth extends StudioAuth {
 
   @override
   void revokeToken(String token) => _sessions.remove(token);
+
+  @override
+  String? weaknessReason() => credentialWeakness(username, password);
 
   @override
   bool isAuthenticated(Map<String, String> headers) {
@@ -241,6 +252,10 @@ class JwtStudioAuth extends StudioAuth {
     return _createJwt(u);
   }
 
+  @override
+  String? weaknessReason() =>
+      credentialWeakness(username, password) ?? secretWeakness(secret);
+
   /// JWT auth is stateless — no server-side token list to update.
   ///
   /// To support immediate revocation (e.g. forced logout across devices),
@@ -264,6 +279,44 @@ class JwtStudioAuth extends StudioAuth {
     final httpOnlyAttr = httpOnly ? '; HttpOnly' : '';
     return '$_cookieName=; Path=$path$httpOnlyAttr; SameSite=Lax; Max-Age=0';
   }
+}
+
+// ── Credential checks ─────────────────────────────────────────────────────────
+
+/// Shortest studio password [credentialWeakness] accepts.
+const minStudioPasswordLength = 12;
+
+/// Shortest signing secret [secretWeakness] accepts.
+const minStudioSecretLength = 32;
+
+/// Why [username]/[password] are too weak for the studio, or `null`.
+String? credentialWeakness(String username, String password) {
+  if (username.isEmpty) return 'the username is empty';
+  if (password.length < minStudioPasswordLength) {
+    return 'the password is shorter than $minStudioPasswordLength characters';
+  }
+  if (password.toLowerCase() == username.toLowerCase()) {
+    return 'the password is the same as the username';
+  }
+  if (_isPlaceholder(password)) return 'the password is a placeholder value';
+  return null;
+}
+
+/// Why [secret] is too weak to sign studio tokens, or `null`.
+String? secretWeakness(String secret) {
+  if (secret.length < minStudioSecretLength) {
+    return 'the signing secret is shorter than $minStudioSecretLength characters';
+  }
+  if (_isPlaceholder(secret)) return 'the signing secret is a placeholder value';
+  return null;
+}
+
+bool _isPlaceholder(String value) {
+  final v = value.toLowerCase().replaceAll(RegExp(r'[^a-z0-9]'), '');
+  return v.contains('changeme') ||
+      v.contains('changethis') ||
+      v.contains('yoursecret') ||
+      v.contains('yourpassword');
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────

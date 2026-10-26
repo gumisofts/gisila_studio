@@ -105,26 +105,40 @@ await io.serve(studio.handler(prefix: ''), 'localhost', 8081);
 
 ## Authentication
 
-If `STUDIO_USERNAME` and `STUDIO_PASSWORD` environment variables are
-set, every page is gated behind a login form. Credentials can also be
-passed directly to the constructor:
+The studio needs a login. Set `STUDIO_USERNAME` and `STUDIO_PASSWORD`, or
+pass credentials or a full `auth:` strategy to the constructor:
 
 ```dart
 final studio = GisilaStudio(
   db: db,
   title: 'My App Admin',
-  username: 'admin',
-  password: 'supersecret',
+  username: Platform.environment['STUDIO_USERNAME'],
+  password: Platform.environment['STUDIO_PASSWORD'],
+  // Optional: sign stateless JWTs instead of keeping in-memory sessions.
+  secret: Platform.environment['STUDIO_SECRET'],
 );
 ```
 
-Sessions are managed in-process with `HttpOnly; SameSite=Lax` cookies.
-A logout link appears in the sidebar header when authentication is
-enabled.
+With a `secret` (or `STUDIO_SECRET`) the studio uses `JwtStudioAuth`;
+without one, `SessionStudioAuth`. Sessions live in one isolate's memory, so
+a server that runs several isolates on one port needs `JwtStudioAuth`.
+Cookies are `HttpOnly; SameSite=Lax`, scoped to the mount prefix, and a
+sign-out action appears in the header.
 
-If neither the environment variables nor the constructor arguments are
-provided the studio runs without authentication — suitable for local
-development only.
+### Insecure setups are refused
+
+Instead of the admin, the studio serves a "Studio is disabled" page (HTTP
+503) and logs the reason to stderr when:
+
+- no login is configured. Pass `allowUnauthenticated: true` to run without
+  one, for local development only; or
+- the login is weak: a password under 12 characters, equal to the username,
+  or a placeholder such as `change-me`, or a signing secret under 32
+  characters. Pass `allowInsecure: true` or set `GISILA_ALLOW_INSECURE=1`
+  to serve anyway (a warning is logged).
+
+The rest of the app keeps running either way. Custom `StudioAuth`
+strategies can join in by overriding `weaknessReason()`.
 
 ---
 
@@ -134,8 +148,12 @@ development only.
 GisilaStudio({
   required Database db,
   String title = 'Gisila Studio',
-  String? username,   // falls back to STUDIO_USERNAME env var
-  String? password,   // falls back to STUDIO_PASSWORD env var
+  StudioAuth? auth,                   // full strategy; overrides the next three
+  String? username,                   // falls back to STUDIO_USERNAME
+  String? password,                   // falls back to STUDIO_PASSWORD
+  String? secret,                     // falls back to STUDIO_SECRET; enables JWT auth
+  bool allowUnauthenticated = false,  // serve with no login (dev only)
+  bool? allowInsecure,                // serve with weak credentials; default GISILA_ALLOW_INSECURE=1
 })
 ```
 

@@ -9,6 +9,7 @@ import 'package:shelf/shelf.dart';
 import 'auth.dart';
 import 'handler.dart';
 import 'model_admin.dart';
+import 'ui/login_page.dart';
 
 /// Web-based admin interface for gisila models, inspired by Django admin.
 ///
@@ -78,27 +79,82 @@ class GisilaStudio {
   /// ```
   ///
   /// 2. Use the shorthand [username] / [password] parameters (or the env vars
-  ///    `STUDIO_USERNAME` / `STUDIO_PASSWORD`) which create a
-  ///    [SessionStudioAuth] for you.
+  ///    `STUDIO_USERNAME` / `STUDIO_PASSWORD`). With a [secret] (or
+  ///    `STUDIO_SECRET`) they build a [JwtStudioAuth], which works across
+  ///    isolates; without one, a [SessionStudioAuth], which suits a
+  ///    single-isolate server only.
   ///
-  /// If neither option is configured the studio runs without authentication
-  /// (suitable for local development only).
+  /// **Refusing insecure setups:** the studio serves a "disabled" page
+  /// (HTTP 503) instead of the admin, and logs why to stderr, when
+  ///
+  /// * no auth is configured, unless [allowUnauthenticated] is `true`
+  ///   (local development only); or
+  /// * the credentials are weak (see [StudioAuth.weaknessReason]: passwords
+  ///   under 12 characters, equal to the username or a placeholder, signing
+  ///   secrets under 32 characters), unless [allowInsecure] is `true` or the
+  ///   `GISILA_ALLOW_INSECURE=1` env var is set.
+  ///
+  /// The rest of the app keeps running either way.
   GisilaStudio({
     required Database db,
     this.title = 'Gisila Studio',
     StudioAuth? auth,
     String? username,
     String? password,
+    String? secret,
+    this.allowUnauthenticated = false,
+    bool? allowInsecure,
   })  : _db = db,
-        _auth = auth ?? _buildSessionAuth(username, password);
+        allowInsecure = allowInsecure ??
+            Platform.environment['GISILA_ALLOW_INSECURE'] == '1',
+        _auth = auth ?? _buildAuth(username, password, secret);
 
-  static StudioAuth? _buildSessionAuth(String? username, String? password) {
-    final u = username ?? Platform.environment['STUDIO_USERNAME'];
-    final p = password ?? Platform.environment['STUDIO_PASSWORD'];
-    if (u != null && u.isNotEmpty && p != null && p.isNotEmpty) {
-      return SessionStudioAuth(username: u, password: p);
+  /// Serve the studio with no login at all. Anyone who can reach it gets
+  /// full read/write access to every registered table.
+  final bool allowUnauthenticated;
+
+  /// Serve the studio even when [StudioAuth.weaknessReason] objects. Defaults
+  /// to the `GISILA_ALLOW_INSECURE=1` env var.
+  final bool allowInsecure;
+
+  static StudioAuth? _buildAuth(
+      String? username, String? password, String? secret) {
+    final env = Platform.environment;
+    final u = username ?? env['STUDIO_USERNAME'];
+    final p = password ?? env['STUDIO_PASSWORD'];
+    final s = secret ?? env['STUDIO_SECRET'];
+    if (u == null || u.isEmpty || p == null || p.isEmpty) return null;
+    if (s != null && s.isNotEmpty) {
+      return JwtStudioAuth(username: u, password: p, secret: s);
     }
-    return null;
+    return SessionStudioAuth(username: u, password: p);
+  }
+
+  /// Why the studio refuses to serve, or `null` when it will. Warnings for
+  /// setups that are allowed but insecure go to stderr.
+  String? _disabledReason() {
+    final auth = _auth;
+    if (auth == null) {
+      if (allowUnauthenticated) {
+        stderr.writeln('gisila_studio: WARNING: "$title" has no login; anyone '
+            'who can reach it can read and change every registered table.');
+        return null;
+      }
+      return 'no login is configured. Set STUDIO_USERNAME and '
+          'STUDIO_PASSWORD, or pass auth:. For local development only, pass '
+          'allowUnauthenticated: true.';
+    }
+    final weakness = auth.weaknessReason();
+    if (weakness == null) return null;
+    if (allowInsecure) {
+      stderr.writeln('gisila_studio: WARNING: "$title" is served with weak '
+          'credentials ($weakness) because allowInsecure is set.');
+      return null;
+    }
+    return 'its login is too weak: $weakness. Use a password of at least '
+        '$minStudioPasswordLength characters and a signing secret of at '
+        'least $minStudioSecretLength. To override, pass allowInsecure: true '
+        'or set GISILA_ALLOW_INSECURE=1.';
   }
 
   /// Register a model with the admin.
@@ -114,6 +170,11 @@ class GisilaStudio {
   /// * [searchFields] — columns to `ILIKE` search against.
   /// * [readonlyFields] — columns shown on forms but not editable.
   /// * [excludeFields] — columns completely hidden from forms.
+  /// * [passwordFields] — columns holding secrets: masked and never
+  ///   pre-filled on forms, hidden from the default list view and the delete
+  ///   page, and kept as-is when left blank on edit. Defaults to columns
+  ///   whose name contains `password`, `passwd` or `secret`; pass
+  ///   `const []` to opt out.
   /// * [autoNowOnUpdateFields] — columns automatically stamped with the current
   ///   UTC timestamp on every save (create or update). Typically used together
   ///   with [readonlyFields] so the user cannot edit the value manually while
@@ -129,6 +190,7 @@ class GisilaStudio {
     List<String> searchFields = const [],
     List<String> readonlyFields = const [],
     List<String> excludeFields = const [],
+    List<String>? passwordFields,
     List<String> autoNowOnUpdateFields = const [],
     int pageSize = 25,
     List<String> ordering = const [],
@@ -142,6 +204,7 @@ class GisilaStudio {
       searchFields: searchFields,
       readonlyFields: readonlyFields,
       excludeFields: excludeFields,
+      passwordFields: passwordFields,
       autoNowOnUpdateFields: autoNowOnUpdateFields,
       pageSize: pageSize,
       ordering: ordering,
@@ -165,6 +228,17 @@ class GisilaStudio {
     // Normalise: no trailing slash.
     final p =
         prefix.endsWith('/') ? prefix.substring(0, prefix.length - 1) : prefix;
+
+    final disabled = _disabledReason();
+    if (disabled != null) {
+      stderr.writeln('gisila_studio: "$title" is disabled: $disabled');
+      final page = renderDisabledPage(prefix: p, studioTitle: title);
+      return (Request _) => Response(
+            503,
+            body: page,
+            headers: {'content-type': 'text/html; charset=utf-8'},
+          );
+    }
 
     return buildStudioHandler(
       admins: List.unmodifiable(_admins),

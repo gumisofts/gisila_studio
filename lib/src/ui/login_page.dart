@@ -59,6 +59,31 @@ String renderLoginPage({
 </html>''';
 }
 
+/// The page served instead of the studio when it refuses to run with an
+/// insecure setup. The reason goes to the server log, not to the visitor.
+String renderDisabledPage({required String prefix, required String studioTitle}) =>
+    '''<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Unavailable — ${_esc(studioTitle)}</title>
+  <style>$studioStyles</style>
+</head>
+<body>
+  ${renderHeader(prefix: prefix, studioTitle: studioTitle)}
+  <main class="login-page">
+    <div class="login-wrap">
+      <h1 class="login-heading">Studio is disabled</h1>
+      <div class="notification notification-error" role="alert">
+        ${icon('error-filled', size: 20)}
+        <div>Its login is not configured securely, so it is switched off. The server log says what to change.</div>
+      </div>
+    </div>
+  </main>
+</body>
+</html>''';
+
 String _esc(String s) => s
     .replaceAll('&', '&amp;')
     .replaceAll('<', '&lt;')

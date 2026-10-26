@@ -2,7 +2,10 @@
 ///
 /// Run:
 ///   dart pub get
-///   dart run bin/server.dart
+///   STUDIO_USERNAME=admin STUDIO_PASSWORD=<12+ characters> \
+///     dart run bin/server.dart
+///
+/// Without a login the studio serves a "disabled" page; see the README.
 ///
 /// Then open http://localhost:8080/studio/
 ///
