@@ -50,8 +50,12 @@ class ModelAdmin<T> {
   /// Normalized to DB column names.
   final List<String> excludeFields;
 
-  /// Columns rendered as password inputs (masked, never pre-filled).
-  /// Normalized to DB column names.
+  /// Columns holding secrets: rendered as password inputs (masked, never
+  /// pre-filled), left out of the default list view and the delete summary,
+  /// and left unchanged when submitted blank on edit. When not given, any
+  /// column whose name contains `password`, `passwd` or `secret` is
+  /// treated as one; pass `const []` to opt out. Normalized to DB column
+  /// names.
   final List<String> passwordFields;
 
   /// Columns that should be automatically set to the current UTC timestamp
@@ -81,7 +85,7 @@ class ModelAdmin<T> {
     List<String> searchFields = const [],
     List<String> readonlyFields = const [],
     List<String> excludeFields = const [],
-    List<String> passwordFields = const [],
+    List<String>? passwordFields,
     List<String> autoNowOnUpdateFields = const [],
     this.pageSize = 25,
     List<String> ordering = const [],
@@ -96,8 +100,9 @@ class ModelAdmin<T> {
             readonlyFields.map((c) => _resolveColumn(c, meta))),
         excludeFields = List.unmodifiable(
             excludeFields.map((c) => _resolveColumn(c, meta))),
-        passwordFields = List.unmodifiable(
-            passwordFields.map((c) => _resolveColumn(c, meta))),
+        passwordFields = List.unmodifiable(passwordFields == null
+            ? meta.columnNames.where(_looksSecret)
+            : passwordFields.map((c) => _resolveColumn(c, meta))),
         autoNowOnUpdateFields = List.unmodifiable(
             autoNowOnUpdateFields.map((c) => _resolveColumn(c, meta))),
         ordering = List.unmodifiable(ordering.map((t) {
@@ -108,8 +113,13 @@ class ModelAdmin<T> {
         }));
 
   /// Columns visible in the list view (resolved, with defaults applied).
+  /// The default skips [passwordFields].
   List<String> get effectiveListDisplay =>
-      listDisplay ?? meta.columnNames.take(6).toList();
+      listDisplay ??
+      meta.columnNames
+          .where((c) => !passwordFields.contains(c))
+          .take(6)
+          .toList();
 
   /// Order-by clauses for SQL, derived from [ordering] or falling back to
   /// the primary key.
@@ -141,7 +151,7 @@ ModelAdmin<T> buildModelAdmin<T>(
   List<String> searchFields = const [],
   List<String> readonlyFields = const [],
   List<String> excludeFields = const [],
-  List<String> passwordFields = const [],
+  List<String>? passwordFields,
   List<String> autoNowOnUpdateFields = const [],
   int pageSize = 25,
   List<String> ordering = const [],
@@ -178,6 +188,11 @@ String _humanize(String snake) => snake
 /// transform matches a real column, that snake_case name is used;
 /// otherwise [name] is returned as-is so the user gets a clear error
 /// for genuine typos.
+bool _looksSecret(String column) {
+  final c = column.toLowerCase();
+  return c.contains('password') || c.contains('passwd') || c.contains('secret');
+}
+
 String _resolveColumn(String name, TableMeta meta) {
   if (meta.columnNames.contains(name)) return name;
   final snake = _camelToSnake(name);

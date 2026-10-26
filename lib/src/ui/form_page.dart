@@ -45,7 +45,8 @@ String renderFormPage({
       label: _humanize(colName),
       info: info,
       isReadonly: isReadonly,
-      isRequired: isRequired,
+      // Blank keeps the current secret on edit, so it is never required.
+      isRequired: isRequired && !(isPassword && !isAdd),
       isPassword: isPassword,
       currentValue: currentValue,
       hasError: hasError,
@@ -156,9 +157,11 @@ String _buildField({
   }
 
   // Hint for FK columns
-  final hint = info != null && info.dataType.isNotEmpty && !isReadonly
-      ? '<div class="field-hint">${_esc(info.dataType)}${info.isNullable ? ' · optional' : ''}</div>'
-      : '';
+  final hint = isPassword && currentValue != null
+      ? '<div class="field-hint">Leave blank to keep the current value.</div>'
+      : info != null && info.dataType.isNotEmpty && !isReadonly
+          ? '<div class="field-hint">${_esc(info.dataType)}${info.isNullable ? ' · optional' : ''}</div>'
+          : '';
 
   return '''
     <div class="field${hasError ? ' has-error' : ''}">

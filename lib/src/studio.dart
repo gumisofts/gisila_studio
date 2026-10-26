@@ -114,6 +114,11 @@ class GisilaStudio {
   /// * [searchFields] — columns to `ILIKE` search against.
   /// * [readonlyFields] — columns shown on forms but not editable.
   /// * [excludeFields] — columns completely hidden from forms.
+  /// * [passwordFields] — columns holding secrets: masked and never
+  ///   pre-filled on forms, hidden from the default list view and the delete
+  ///   page, and kept as-is when left blank on edit. Defaults to columns
+  ///   whose name contains `password`, `passwd` or `secret`; pass
+  ///   `const []` to opt out.
   /// * [autoNowOnUpdateFields] — columns automatically stamped with the current
   ///   UTC timestamp on every save (create or update). Typically used together
   ///   with [readonlyFields] so the user cannot edit the value manually while
@@ -129,6 +134,7 @@ class GisilaStudio {
     List<String> searchFields = const [],
     List<String> readonlyFields = const [],
     List<String> excludeFields = const [],
+    List<String>? passwordFields,
     List<String> autoNowOnUpdateFields = const [],
     int pageSize = 25,
     List<String> ordering = const [],
@@ -142,6 +148,7 @@ class GisilaStudio {
       searchFields: searchFields,
       readonlyFields: readonlyFields,
       excludeFields: excludeFields,
+      passwordFields: passwordFields,
       autoNowOnUpdateFields: autoNowOnUpdateFields,
       pageSize: pageSize,
       ordering: ordering,

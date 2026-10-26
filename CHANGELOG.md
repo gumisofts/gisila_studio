@@ -1,5 +1,15 @@
 # Changelog
 
+## Unreleased
+
+- Security: columns holding secrets no longer show up in the studio. The
+  delete page's record summary and the default list view (no
+  `listDisplay`) skip `passwordFields`, and `register()` now accepts
+  `passwordFields`. When it isn't given, any column whose name contains
+  `password`, `passwd` or `secret` counts as one; pass `const []` to opt
+  out. Edit forms leave a password field blank and not required, and a
+  blank submission keeps the stored value instead of overwriting it.
+
 ## 0.1.1
 
 - Unified version with the rest of the gisila ecosystem (`gisila`, `gisila_doc`, `gisila_orm`).
