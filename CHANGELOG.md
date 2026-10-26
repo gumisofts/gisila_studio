@@ -9,6 +9,14 @@
   `password`, `passwd` or `secret` counts as one; pass `const []` to opt
   out. Edit forms leave a password field blank and not required, and a
   blank submission keeps the stored value instead of overwriting it.
+- UI: restyled on the IBM Carbon Design System (v11). Carbon colour tokens
+  with the g10 theme, switching to g100 when the browser prefers dark mode;
+  IBM Plex Sans/Mono; the Carbon UI shell (header plus side nav, which
+  becomes a drawer below 1056px); Carbon data table with toolbar search,
+  batch-action bar and pagination; Carbon text inputs with helper and error
+  states; button sets; inline notifications; clickable tiles on the
+  overview; a danger dialog for deletes; Carbon icons inlined as SVG. No
+  route or form-field changes.
 
 ## 0.1.1
 

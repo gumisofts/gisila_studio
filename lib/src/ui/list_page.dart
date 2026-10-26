@@ -3,6 +3,7 @@ library gisila_studio.ui.list_page;
 
 import '../column_info.dart';
 import '../model_admin.dart';
+import 'icons.dart';
 import 'layout.dart';
 
 /// Renders the list view for a model.
@@ -32,11 +33,9 @@ String renderListPage({
   final rowsHtml = rows.isEmpty
       ? '''
         <tr>
-          <td colspan="${displayCols.length + 1}" style="padding:0;cursor:default">
+          <td colspan="${displayCols.length + 1}" style="padding:0;cursor:default;max-width:none;white-space:normal">
             <div class="empty-state">
-              <div class="empty-icon">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              </div>
+              ${icon(searchQuery != null ? 'search' : 'data-table', size: 64)}
               <h3>${searchQuery != null ? 'No results found' : 'Nothing here yet'}</h3>
               <p>${searchQuery != null ? 'Try a different search for "${_esc(searchQuery)}".' : 'Add your first ${_esc(admin.displayName)} to populate this list.'}</p>
             </div>
@@ -54,9 +53,9 @@ String renderListPage({
             final isFirst = col == displayCols.first;
 
             if (display == '✓')
-              return '<td><span class="bool-yes">Yes</span></td>';
+              return '<td><span class="tag tag-green">Yes</span></td>';
             if (display == '✗')
-              return '<td><span class="bool-no">No</span></td>';
+              return '<td><span class="tag tag-gray">No</span></td>';
 
             if (isFirst) return '<td class="td-primary">${_esc(display)}</td>';
 
@@ -74,23 +73,21 @@ String renderListPage({
 
           return '''
             <tr data-href="$href">
-              <td class="cb-col"><input type="checkbox" class="row-cb" name="ids" value="${_esc(pkStr)}"></td>
+              <td class="cb-col"><input type="checkbox" class="row-cb" form="list-form" name="ids" value="${_esc(pkStr)}" aria-label="Select row"></td>
               $cells
             </tr>''';
         }).join('\n');
 
   final searchVal = searchQuery != null ? _esc(searchQuery) : '';
-  final searchBar = admin.searchFields.isNotEmpty
+  final search = admin.searchFields.isNotEmpty
       ? '''
-        <div class="table-toolbar">
-          <form method="get" action="$prefix/$table/" style="display:contents">
-            <div class="search-wrap">
-              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
-              <input type="text" name="q" placeholder="Search ${_esc(admin.displayNamePlural)}…" value="$searchVal">
-            </div>
-            ${searchQuery != null ? '<a class="btn btn-ghost btn-sm" href="$prefix/$table/">Clear</a>' : ''}
-          </form>
-        </div>'''
+            <form method="get" action="$prefix/$table/" role="search">
+              <div class="toolbar-search">
+                ${icon('search')}
+                <input type="search" name="q" placeholder="Search ${_esc(admin.displayNamePlural.toLowerCase())}" value="$searchVal" aria-label="Search">
+                ${searchQuery != null ? '<a class="toolbar-search-clear" href="$prefix/$table/" aria-label="Clear search">${icon('close')}</a>' : ''}
+              </div>
+            </form>'''
       : '';
 
   final totalPages =
@@ -98,83 +95,89 @@ String renderListPage({
   final rangeStart = rows.isEmpty ? 0 : (page - 1) * pageSize + 1;
   final rangeEnd = (page - 1) * pageSize + rows.length;
 
-  String pgLink(int p, String label,
-      {bool disabled = false, bool current = false}) {
-    if (disabled) return '<span class="disabled">$label</span>';
-    if (current) return '<span class="current">$label</span>';
+  String pageHref(int p) {
     final q = searchQuery != null
         ? '&q=${Uri.encodeQueryComponent(searchQuery)}'
         : '';
-    return '<a href="$prefix/$table/?page=$p$q">$label</a>';
+    return '$prefix/$table/?page=$p$q';
   }
 
+  String pgLink(int p) => p == page
+      ? '<span class="current" aria-current="page">$p</span>'
+      : '<a href="${pageHref(p)}" aria-label="Page $p">$p</a>';
+
   final pgLinks = StringBuffer();
-  pgLinks.write(pgLink(page - 1, '‹', disabled: page <= 1));
   final first = (page - 2).clamp(1, totalPages);
   final last = (page + 2).clamp(1, totalPages);
   if (first > 1) {
-    pgLinks.write(pgLink(1, '1'));
+    pgLinks.write(pgLink(1));
     if (first > 2) pgLinks.write('<span>…</span>');
   }
   for (var p = first; p <= last; p++) {
-    pgLinks.write(pgLink(p, '$p', current: p == page));
+    pgLinks.write(pgLink(p));
   }
   if (last < totalPages) {
     if (last < totalPages - 1) pgLinks.write('<span>…</span>');
-    pgLinks.write(pgLink(totalPages, '$totalPages'));
+    pgLinks.write(pgLink(totalPages));
   }
-  pgLinks.write(pgLink(page + 1, '›', disabled: page >= totalPages));
+
+  String step(int p, String iconName, String label, bool disabled) => disabled
+      ? '<span class="pagination-step disabled" aria-disabled="true">${icon(iconName)}</span>'
+      : '<a class="pagination-step" href="${pageHref(p)}" aria-label="$label">${icon(iconName)}</a>';
 
   final subtitle = searchQuery != null
       ? '${_fmt(totalCount)} results for "${_esc(searchQuery)}"'
       : '${_fmt(totalCount)} records';
 
-  final addBtn = '''
-    <a class="btn btn-primary btn-sm" href="$prefix/$table/add/">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
-      New ${_esc(admin.displayName)}
-    </a>''';
-
   final body = '''
-    <div class="page-hdr">
-      <div class="page-title">${_esc(admin.displayNamePlural)}</div>
-      <div class="page-meta">$subtitle</div>
-    </div>
-
-    <form id="list-form" method="post" action="$prefix/$table/action/">
-      <div class="sel-bar" id="sel-bar">
-        <span class="sel-count">0 selected</span>
-        <div class="sel-sep"></div>
-        <button type="button" class="btn btn-ghost btn-sm" id="clear-sel">Clear</button>
-        <button type="submit" class="btn btn-danger btn-sm" name="action" value="delete"
-                onclick="return confirm('Delete selected records? This cannot be undone.')">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
-          Delete
-        </button>
+    <form id="list-form" method="post" action="$prefix/$table/action/"></form>
+    <div class="data-table-container">
+      <div class="data-table-header">
+        <h1 class="data-table-title">${_esc(admin.displayNamePlural)}</h1>
+        <p class="data-table-desc">$subtitle</p>
       </div>
 
-      <div class="table-card">
-        $searchBar
-        <div style="overflow-x:auto">
-          <table>
-            <thead>
-              <tr>
-                <th class="cb-col">
-                  <input type="checkbox" id="select-all" title="Select all">
-                </th>
-                $headers
-              </tr>
-            </thead>
-            <tbody>$rowsHtml</tbody>
-          </table>
+      <section class="table-toolbar" aria-label="Table toolbar">
+        <div class="batch-actions" id="sel-bar" aria-hidden="true">
+          <span class="batch-summary sel-count">0 items selected</span>
+          <button type="submit" form="list-form" class="btn btn-primary" name="action" value="delete"
+                  onclick="return confirm('Delete the selected records? This cannot be undone.')">
+            Delete ${icon('trash')}
+          </button>
+          <span class="batch-sep"></span>
+          <button type="button" class="btn btn-primary" id="clear-sel">Cancel</button>
         </div>
-        ${rows.isNotEmpty ? '''
-        <div class="pagination">
-          <span class="pagination-info">$rangeStart–$rangeEnd of ${_fmt(totalCount)}</span>
-          <div class="pagination-links">$pgLinks</div>
-        </div>''' : ''}
+        <div class="toolbar-content">
+          $search
+          <a class="btn btn-primary" href="$prefix/$table/add/">
+            <span class="btn-label">Add ${_esc(admin.displayName.toLowerCase())}</span>${icon('add')}
+          </a>
+        </div>
+      </section>
+
+      <div class="table-scroll">
+        <table aria-label="${_esc(admin.displayNamePlural)}">
+          <thead>
+            <tr>
+              <th class="cb-col">
+                <input type="checkbox" id="select-all" aria-label="Select all rows">
+              </th>
+              $headers
+            </tr>
+          </thead>
+          <tbody>$rowsHtml</tbody>
+        </table>
       </div>
-    </form>''';
+      ${rows.isNotEmpty ? '''
+      <div class="pagination">
+        <span class="pagination-info">$rangeStart–$rangeEnd of ${_fmt(totalCount)} items</span>
+        <div class="pagination-right">
+          <nav class="pagination-pages" aria-label="Pages">$pgLinks</nav>
+          ${step(page - 1, 'chevron-left', 'Previous page', page <= 1)}
+          ${step(page + 1, 'chevron-right', 'Next page', page >= totalPages)}
+        </div>
+      </div>''' : ''}
+    </div>''';
 
   return renderLayout(
     title: admin.displayNamePlural,
@@ -185,7 +188,6 @@ String renderListPage({
     activeTable: table,
     studioTitle: studioTitle,
     topbarBreadcrumbs: [(admin.displayNamePlural, null)],
-    topbarRight: addBtn,
     flashMessage: flashMessage,
     flashIsError: flashIsError,
     showLogout: showLogout,
