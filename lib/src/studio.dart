@@ -179,6 +179,9 @@ class GisilaStudio {
   ///   UTC timestamp on every save (create or update). Typically used together
   ///   with [readonlyFields] so the user cannot edit the value manually while
   ///   the studio still keeps it up-to-date, e.g. `['updatedAt']`.
+  /// * [onSave] — per-column hooks that transform a submitted value before
+  ///   it is written, e.g. `{'password': (v) => hashPassword(v as String)}`.
+  ///   Without one, a password column stores exactly what was typed.
   /// * [pageSize] — rows per page (default 25).
   /// * [ordering] — default list ordering; prefix with `-` for DESC,
   ///   e.g. `['-date_joined', 'email']`.
@@ -192,11 +195,12 @@ class GisilaStudio {
     List<String> excludeFields = const [],
     List<String>? passwordFields,
     List<String> autoNowOnUpdateFields = const [],
+    Map<String, StudioSaveHook> onSave = const {},
     int pageSize = 25,
     List<String> ordering = const [],
     String? group,
   }) {
-    _admins.add(buildModelAdmin<T>(
+    final admin = buildModelAdmin<T>(
       meta,
       displayName: displayName,
       displayNamePlural: displayNamePlural,
@@ -206,10 +210,19 @@ class GisilaStudio {
       excludeFields: excludeFields,
       passwordFields: passwordFields,
       autoNowOnUpdateFields: autoNowOnUpdateFields,
+      onSave: onSave,
       pageSize: pageSize,
       ordering: ordering,
       group: group,
-    ));
+    );
+    final unhashed = admin.passwordFields
+        .where((c) => admin.isEditable(c) && !admin.onSave.containsKey(c));
+    if (unhashed.isNotEmpty) {
+      stderr.writeln('gisila_studio: WARNING: ${meta.tableName}.'
+          '${unhashed.join(', ')} will be stored exactly as typed in the '
+          'studio. Pass onSave: to hash it, or make it read-only.');
+    }
+    _admins.add(admin);
   }
 
   /// Build the Shelf [Handler] for the admin interface.

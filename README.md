@@ -168,11 +168,29 @@ void register<T>(
   List<String> searchFields,  // ILIKE search targets
   List<String> readonlyFields,// shown on forms but not editable
   List<String> excludeFields, // hidden from forms entirely
+  List<String>? passwordFields, // masked, never pre-filled; default: names
+                              // containing password/passwd/secret
+  List<String> autoNowOnUpdateFields, // stamped with now() on every save
+  Map<String, StudioSaveHook> onSave, // per-column transform before writing
   int pageSize = 25,
   List<String> ordering,      // default sort; prefix with '-' for DESC
   String? group,              // sidebar section label
 })
 ```
+
+A password column stores exactly what is typed unless you give it an
+`onSave` hook, and the studio warns at startup when one has none. Hash it
+with the same function your app uses:
+
+```dart
+studio.register<User>(
+  UserTable.metadata,
+  onSave: {'password': (v) => hashPassword(v as String)},
+);
+```
+
+Leaving a password blank on edit keeps the stored value and skips the hook.
+Throw a `FormatException` from a hook to show its message on the field.
 
 ### `handler`
 
@@ -190,13 +208,14 @@ correctly. Pass an empty string when serving standalone.
 
 | Feature | Details |
 | ------- | ------- |
-| List view | Paginated table with configurable columns, search, and sort. |
+| List view | Paginated table with configurable columns and search, ordered by `ordering` (no per-column sorting yet). Very large tables show an estimated row count. |
 | Add / change forms | Auto-generated from column metadata; respects `readonlyFields` and `excludeFields`. |
-| Delete | Single-row delete from the change form or the list action bar. |
+| Delete | Single-row delete from its confirmation page, or bulk delete from the list. |
 | Search | `ILIKE '%query%'` across all `searchFields`. |
-| Ordering | Click column headers in the list; default order via `ordering`. |
+| Ordering | Set per model with `ordering` (prefix `-` for descending). |
 | Sidebar groups | `group:` parameter groups models under a labelled section. |
-| Authentication | Session-based login form; credentials from env vars or constructor. |
+| Authentication | Login form with a cookie session, or stateless JWTs when a `secret` is set (works across isolates). Refuses to serve without credentials or with weak ones unless told otherwise (`allowUnauthenticated`, `allowInsecure`). CSRF tokens on every form, throttled sign-in, `Secure` cookies on HTTPS. |
+| Password fields | Masked, never pre-filled, kept when left blank; `onSave` hooks hash them before writing. |
 | Custom title | Set `title` to brand the admin interface. |
 
 ---
@@ -206,7 +225,7 @@ correctly. Pass an empty string when serving standalone.
 | Path | Description |
 | ---- | ----------- |
 | `{prefix}/` | Dashboard — lists all registered models. |
-| `{prefix}/{model}/` | List view — paginated rows with search and sort. |
+| `{prefix}/{model}/` | List view — paginated rows with search. |
 | `{prefix}/{model}/add/` | Add form. |
 | `{prefix}/{model}/{pk}/change/` | Change (edit) form. |
 | `{prefix}/{model}/{pk}/delete/` | Delete confirmation. |
