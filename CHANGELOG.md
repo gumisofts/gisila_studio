@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+- `register()` takes `onSave:`, per-column hooks that transform a submitted
+  value before it is written (hash a password, normalise an email). A
+  `FormatException` from a hook is shown on the field. Password columns
+  without a hook log a startup warning, since they store what is typed.
+- Security: every POST made with the studio cookie must carry the
+  session's CSRF token (`_csrf`), which the studio adds to each of its POST
+  forms; requests authenticated with a Bearer token are exempt. The token is
+  derived from the session token (`studioCsrfToken`), so all isolates agree.
+  Forms you render yourself under the studio need the field too.
+- Security: sign-in is throttled per client address (10 failures in 15
+  minutes → `429`, per isolate). Behind a proxy all clients share its
+  address.
+- Security: the auth cookie gets `Secure` when the request came over HTTPS
+  (directly or per `X-Forwarded-Proto`). Credentials and JWT signatures are
+  compared in constant time (`constantTimeEquals`).
 - Forms: a value that doesn't parse (letters in a number field, a bad
   date) is now a field error (422) instead of being saved as NULL. A blank
   NOT NULL field uses the column's database default when it has one (on

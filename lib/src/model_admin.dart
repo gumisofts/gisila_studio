@@ -1,7 +1,15 @@
 /// Configuration for a single model registered in Gisila Studio.
 library gisila_studio.model_admin;
 
+import 'dart:async';
+
 import 'package:gisila_orm/gisila.dart';
+
+/// Transforms a submitted value before the studio writes it, e.g. hashing a
+/// password. Receives the parsed value (a `String` for text columns, `null`
+/// for an empty nullable field) and returns what to store. Throw a
+/// [FormatException] to reject the input with a message on the field.
+typedef StudioSaveHook = FutureOr<Object?> Function(Object? value);
 
 /// Configuration controlling how a model appears and behaves in the admin.
 ///
@@ -65,6 +73,11 @@ class ModelAdmin<T> {
   /// Normalized to DB column names.
   final List<String> autoNowOnUpdateFields;
 
+  /// Per-column [StudioSaveHook]s run on add and edit, keyed by DB column
+  /// name. A password column left blank on edit keeps its stored value and
+  /// skips its hook.
+  final Map<String, StudioSaveHook> onSave;
+
   /// Number of rows per page in the list view.
   final int pageSize;
 
@@ -87,6 +100,7 @@ class ModelAdmin<T> {
     List<String> excludeFields = const [],
     List<String>? passwordFields,
     List<String> autoNowOnUpdateFields = const [],
+    Map<String, StudioSaveHook> onSave = const {},
     this.pageSize = 25,
     List<String> ordering = const [],
     this.group,
@@ -105,6 +119,9 @@ class ModelAdmin<T> {
             : passwordFields.map((c) => _resolveColumn(c, meta))),
         autoNowOnUpdateFields = List.unmodifiable(
             autoNowOnUpdateFields.map((c) => _resolveColumn(c, meta))),
+        onSave = Map.unmodifiable({
+          for (final e in onSave.entries) _resolveColumn(e.key, meta): e.value
+        }),
         ordering = List.unmodifiable(ordering.map((t) {
           if (t.startsWith('-')) {
             return '-${_resolveColumn(t.substring(1), meta)}';
@@ -153,6 +170,7 @@ ModelAdmin<T> buildModelAdmin<T>(
   List<String> excludeFields = const [],
   List<String>? passwordFields,
   List<String> autoNowOnUpdateFields = const [],
+  Map<String, StudioSaveHook> onSave = const {},
   int pageSize = 25,
   List<String> ordering = const [],
   String? group,
@@ -168,6 +186,7 @@ ModelAdmin<T> buildModelAdmin<T>(
     excludeFields: excludeFields,
     passwordFields: passwordFields,
     autoNowOnUpdateFields: autoNowOnUpdateFields,
+    onSave: onSave,
     pageSize: pageSize,
     ordering: ordering,
     group: group,

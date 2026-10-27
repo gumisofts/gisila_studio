@@ -1,6 +1,7 @@
 /// Shelf route handlers for Gisila Studio.
 library gisila_studio.handler;
 
+import 'dart:io' show HttpConnectionInfo;
 import 'dart:math' show max;
 
 import 'package:gisila_orm/gisila.dart';
@@ -242,6 +243,7 @@ Handler buildStudioHandler({
         errors[colName] = e.message;
       }
     }
+    await _applySaveHooks(admin, values, errors);
 
     if (errors.isNotEmpty) {
       final counts = await fetchCounts();
@@ -363,6 +365,7 @@ Handler buildStudioHandler({
         errors[colName] = e.message;
       }
     }
+    await _applySaveHooks(admin, values, errors);
 
     if (errors.isNotEmpty) {
       final row = await fetchRow(admin, pk);
@@ -521,6 +524,7 @@ Handler buildStudioHandler({
 
   // ── Router assembly ──────────────────────────────────────────────────
 
+  final throttle = _LoginThrottle();
   final router = Router();
   router.get('/', (Request r) => dashboard(r));
 
@@ -538,18 +542,39 @@ Handler buildStudioHandler({
 
     // POST /login/  →  validate credentials, issue token cookie
     router.post('/login/', (Request req) async {
+      final client = _clientAddress(req);
+      if (throttle.blocked(client)) {
+        return Response(
+          429,
+          body: renderLoginPage(
+            prefix: prefix,
+            studioTitle: title,
+            errorMessage: 'Too many failed sign-ins. Try again in a few '
+                'minutes.',
+          ),
+          headers: {
+            'content-type': 'text/html; charset=utf-8',
+            'retry-after': '${_LoginThrottle.window.inSeconds}',
+          },
+        );
+      }
       final params = await bodyParams(req);
       final u = params['username']?.trim() ?? '';
       final p = params['password'] ?? '';
 
       final token = auth.authenticate(u, p);
       if (token != null) {
+        throttle.reset(client);
         return Response.found(
           '$prefix/',
-          headers: {'set-cookie': auth.setCookieHeader(token, prefix: prefix)},
+          headers: {
+            'set-cookie':
+                _secure(req, auth.setCookieHeader(token, prefix: prefix)),
+          },
         );
       }
 
+      throttle.fail(client);
       return Response(
         401,
         body: renderLoginPage(
@@ -567,7 +592,9 @@ Handler buildStudioHandler({
       if (token != null) auth.revokeToken(token);
       return Response.found(
         '$prefix/login/',
-        headers: {'set-cookie': auth.clearCookieHeader(prefix: prefix)},
+        headers: {
+          'set-cookie': _secure(req, auth.clearCookieHeader(prefix: prefix)),
+        },
       );
     });
   }
@@ -587,15 +614,97 @@ Handler buildStudioHandler({
 
   if (auth == null) return router.call;
 
-  // Middleware: gate all non-login routes behind a valid session.
+  // Middleware: gate all non-login routes behind a valid session, and
+  // require the session's CSRF token on every POST made with the cookie.
   return (Request req) async {
     final path = req.url.path;
     final isLoginPath = path == 'login' || path == 'login/';
-    if (!isLoginPath && !auth.isAuthenticated(req.headers)) {
+    if (isLoginPath) return router(req);
+    if (!auth.isAuthenticated(req.headers)) {
       return Response.found('$prefix/login/');
     }
-    return router(req);
+
+    final token = auth.currentToken(req.headers);
+    final csrf = token == null ? null : studioCsrfToken(token);
+    // A Bearer token can't be sent by another site, so it needs no CSRF
+    // token; a cookie can.
+    final viaBearer =
+        req.headers['authorization']?.startsWith('Bearer ') ?? false;
+    var request = req;
+    if (req.method == 'POST' && !viaBearer) {
+      final body = await req.readAsString();
+      String? sent;
+      try {
+        sent = Uri.splitQueryString(body)['_csrf'];
+      } on FormatException {
+        sent = null;
+      }
+      if (csrf == null || sent == null || !constantTimeEquals(sent, csrf)) {
+        return Response.forbidden(
+          'The form has expired or did not come from this studio. '
+          'Go back, reload the page and try again.',
+          headers: {'content-type': 'text/plain; charset=utf-8'},
+        );
+      }
+      request = req.change(body: body);
+    }
+
+    final res = await router(request);
+    if (csrf == null ||
+        !(res.headers['content-type'] ?? '').startsWith('text/html')) {
+      return res;
+    }
+    // Every POST form the studio renders carries the token.
+    final html = await res.readAsString();
+    final field = '<input type="hidden" name="_csrf" value="$csrf">';
+    return res.change(
+        body: html.replaceAllMapped(_postFormTag, (m) => '${m[0]}$field'));
   };
+}
+
+/// An opening `<form>` tag with `method="post"`.
+final _postFormTag = RegExp(r'''<form\b[^>]*\bmethod=["']?post["']?[^>]*>''',
+    caseSensitive: false);
+
+/// Adds `Secure` to [cookie] when [req] came in over HTTPS (directly or, per
+/// `X-Forwarded-Proto`, through a proxy). Worst case a spoofed header only
+/// makes the cookie stricter.
+String _secure(Request req, String cookie) {
+  final proto = req.headers['x-forwarded-proto']?.split(',').first.trim();
+  final https = req.requestedUri.scheme == 'https' || proto == 'https';
+  return https && !cookie.contains('; Secure') ? '$cookie; Secure' : cookie;
+}
+
+String _clientAddress(Request req) {
+  final info = req.context['shelf.io.connection_info'];
+  return info is HttpConnectionInfo ? info.remoteAddress.address : 'unknown';
+}
+
+/// Failed sign-ins per client address. In memory and per isolate, so the
+/// effective limit is [maxFailures] times the isolate count; behind a
+/// proxy every client shares the proxy's address, so the lock applies to
+/// all of them until [window] passes.
+class _LoginThrottle {
+  static const maxFailures = 10;
+  static const window = Duration(minutes: 15);
+
+  final _failures = <String, List<DateTime>>{};
+
+  List<DateTime> _recent(String client) {
+    final cutoff = DateTime.now().subtract(window);
+    final list = _failures[client] ?? <DateTime>[];
+    list.removeWhere((t) => t.isBefore(cutoff));
+    return list;
+  }
+
+  bool blocked(String client) => _recent(client).length >= maxFailures;
+
+  void fail(String client) {
+    if (_failures.length > 10000) _failures.clear();
+    _failures[client] = _recent(client)..add(DateTime.now());
+  }
+
+  void reset(String client) => _failures.remove(client);
 }
 
 // ── SQL helpers ──────────────────────────────────────────────────────────────
@@ -603,6 +712,21 @@ Handler buildStudioHandler({
 /// Tables estimated at this many rows or more show the estimate in the
 /// sidebar instead of an exact count.
 const _exactCountLimit = 100000;
+
+/// Runs [ModelAdmin.onSave] on each submitted value that has a hook. A
+/// [FormatException] becomes an error on that field.
+Future<void> _applySaveHooks(ModelAdmin admin, Map<String, Object?> values,
+    Map<String, String> errors) async {
+  for (final entry in admin.onSave.entries) {
+    final col = entry.key;
+    if (!values.containsKey(col) || errors.containsKey(col)) continue;
+    try {
+      values[col] = await entry.value(values[col]);
+    } on FormatException catch (e) {
+      errors[col] = e.message;
+    }
+  }
+}
 
 String _buildInsertSql(String table, Map<String, Object?> values) {
   if (values.isEmpty) return 'INSERT INTO "$table" DEFAULT VALUES RETURNING *';

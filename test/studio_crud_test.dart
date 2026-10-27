@@ -33,7 +33,18 @@ const _big = TableMeta<Map<String, dynamic>>(
   columnNames: ['id'],
   fromRow: _identity,
 );
+const _accounts = TableMeta<Map<String, dynamic>>(
+  tableName: 'studio_test_accounts',
+  columnNames: ['id', 'email', 'password'],
+  fromRow: _identity,
+);
 Map<String, dynamic> _identity(Map<String, dynamic> r) => r;
+
+Object? _fakeHash(Object? v) {
+  final s = v as String;
+  if (s.length < 4) throw const FormatException('Too short.');
+  return 'hashed:$s';
+}
 
 void main() async {
   final skip = await _reachable() ? false : 'no Postgres on localhost:5454';
@@ -56,7 +67,10 @@ void main() async {
     ]));
     final c = db.context();
     for (final sql in [
-      'DROP TABLE IF EXISTS studio_test_items, studio_test_big',
+      'DROP TABLE IF EXISTS studio_test_items, studio_test_big, '
+          'studio_test_accounts',
+      'CREATE TABLE studio_test_accounts (id serial PRIMARY KEY, '
+          'email text NOT NULL, password text NOT NULL)',
       'CREATE TABLE studio_test_items (id serial PRIMARY KEY, '
           'qty integer NOT NULL, '
           'created_at timestamptz NOT NULL DEFAULT now(), note text)',
@@ -70,7 +84,8 @@ void main() async {
     }
     final studio = GisilaStudio(db: db, allowUnauthenticated: true)
       ..register(_items)
-      ..register(_big);
+      ..register(_big)
+      ..register(_accounts, onSave: {'password': _fakeHash});
     final h = studio.handler(prefix: '/studio');
     handler = (r) => h(r);
   });
@@ -79,7 +94,8 @@ void main() async {
     if (skip != false) return;
     await db
         .context()
-        .execute('DROP TABLE IF EXISTS studio_test_items, studio_test_big');
+        .execute('DROP TABLE IF EXISTS studio_test_items, studio_test_big, '
+            'studio_test_accounts');
     await db.close();
   });
 
@@ -135,6 +151,79 @@ void main() async {
     final after = (await rows()).single;
     expect(after['qty'], 4);
     expect(after['created_at'], stamp);
+  }, skip: skip);
+
+  test('onSave hashes a password on add and edit, never re-hashes (ST-07)',
+      () async {
+    Future<Map<String, dynamic>> account() async =>
+        (await db.context().execute('SELECT * FROM studio_test_accounts'))
+            .single
+            .toColumnMap();
+
+    expect(
+        (await post(
+                '/studio_test_accounts/add/', 'email=a%40x&password=s3cret'))
+            .statusCode,
+        302);
+    final id = (await account())['id'];
+    expect((await account())['password'], 'hashed:s3cret');
+
+    final form =
+        await (await get('/studio_test_accounts/$id/change/')).readAsString();
+    expect(form, isNot(contains('hashed:')));
+
+    // Blank keeps the stored hash; the hook does not run on it.
+    await post('/studio_test_accounts/$id/change/', 'email=b%40x&password=');
+    expect((await account())['password'], 'hashed:s3cret');
+    expect((await account())['email'], 'b@x');
+
+    // A FormatException from the hook is a field error.
+    final bad = await post(
+        '/studio_test_accounts/$id/change/', 'email=b%40x&password=ab');
+    expect(bad.statusCode, 422);
+    expect(await bad.readAsString(), contains('Too short.'));
+    expect((await account())['password'], 'hashed:s3cret');
+
+    await post(
+        '/studio_test_accounts/$id/change/', 'email=b%40x&password=n3wpass');
+    expect((await account())['password'], 'hashed:n3wpass');
+  }, skip: skip);
+
+  test('signed in, forms post with the CSRF token from the page (ST-05)',
+      () async {
+    final studio = GisilaStudio(
+        db: db,
+        username: 'admin',
+        password: 'correct-horse-battery',
+        secret: 'k3P9wq0ZcX1vB7nM2aS8dF4gH6jL5tRyU')
+      ..register(_items);
+    final h = studio.handler(prefix: '/studio');
+    Future<Response> send(String method, String path,
+            {String? body, String? cookie}) async =>
+        await h(Request(method, Uri.parse('http://localhost/studio$path'),
+            handlerPath: '/studio/',
+            body: body,
+            headers: {
+              'content-type': 'application/x-www-form-urlencoded',
+              if (cookie != null) 'cookie': cookie,
+            }));
+
+    final login = await send('POST', '/login/',
+        body: 'username=admin&password=correct-horse-battery');
+    final cookie = login.headers['set-cookie']!.split(';').first;
+    final form =
+        await (await send('GET', '/studio_test_items/add/', cookie: cookie))
+            .readAsString();
+    final csrf =
+        RegExp(r'name="_csrf" value="([^"]+)"').firstMatch(form)!.group(1)!;
+
+    final forged = await send('POST', '/studio_test_items/add/',
+        body: 'qty=7', cookie: cookie);
+    expect(forged.statusCode, 403);
+    final ok = await send('POST', '/studio_test_items/add/',
+        body: 'qty=7&_csrf=$csrf', cookie: cookie);
+    expect(ok.statusCode, 302);
+    expect((await rows()).map((r) => r['qty']), contains(7));
   }, skip: skip);
 
   test('a blank required field without a default is an error', () async {

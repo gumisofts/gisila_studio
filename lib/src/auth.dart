@@ -81,7 +81,7 @@ class SessionStudioAuth extends StudioAuth {
 
   @override
   String? authenticate(String u, String p) {
-    if (u != username || p != password) return null;
+    if (!_credentialsMatch(u, p, username, password)) return null;
     final bytes = List<int>.generate(32, (_) => _rng.nextInt(256));
     final token = base64Url.encode(bytes);
     _sessions.add(token);
@@ -202,9 +202,8 @@ class JwtStudioAuth extends StudioAuth {
     final parts = token.split('.');
     if (parts.length != 3) return false;
 
-    // Constant-time signature check
     final expected = _sign('${parts[0]}.${parts[1]}');
-    if (expected != parts[2]) return false;
+    if (!constantTimeEquals(expected, parts[2])) return false;
 
     try {
       final raw = utf8.decode(base64Url.decode(base64Url.normalize(parts[1])));
@@ -248,7 +247,7 @@ class JwtStudioAuth extends StudioAuth {
 
   @override
   String? authenticate(String u, String p) {
-    if (u != username || p != password) return null;
+    if (!_credentialsMatch(u, p, username, password)) return null;
     return _createJwt(u);
   }
 
@@ -321,6 +320,32 @@ bool _isPlaceholder(String value) {
 }
 
 // ── Shared helpers ────────────────────────────────────────────────────────────
+
+/// Compares [a] and [b] in time that doesn't depend on where they differ.
+/// Both are hashed first, so their lengths don't show either.
+bool constantTimeEquals(String a, String b) {
+  final x = sha256.convert(utf8.encode(a)).bytes;
+  final y = sha256.convert(utf8.encode(b)).bytes;
+  var diff = 0;
+  for (var i = 0; i < x.length; i++) {
+    diff |= x[i] ^ y[i];
+  }
+  return diff == 0;
+}
+
+/// Checks both fields every time, so timing doesn't reveal which was wrong.
+bool _credentialsMatch(String u, String p, String username, String password) {
+  final userOk = constantTimeEquals(u, username);
+  final passOk = constantTimeEquals(p, password);
+  return userOk & passOk;
+}
+
+/// The CSRF token for the session [token]. Derived rather than stored, so
+/// every isolate agrees on it; it can't be computed without the session
+/// token, which lives in an HttpOnly cookie.
+String studioCsrfToken(String token) => base64Url
+    .encode(sha256.convert(utf8.encode('gisila-studio-csrf:$token')).bytes)
+    .replaceAll('=', '');
 
 String _b64url(String data) =>
     base64Url.encode(utf8.encode(data)).replaceAll('=', '');

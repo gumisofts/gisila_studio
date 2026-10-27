@@ -168,11 +168,29 @@ void register<T>(
   List<String> searchFields,  // ILIKE search targets
   List<String> readonlyFields,// shown on forms but not editable
   List<String> excludeFields, // hidden from forms entirely
+  List<String>? passwordFields, // masked, never pre-filled; default: names
+                              // containing password/passwd/secret
+  List<String> autoNowOnUpdateFields, // stamped with now() on every save
+  Map<String, StudioSaveHook> onSave, // per-column transform before writing
   int pageSize = 25,
   List<String> ordering,      // default sort; prefix with '-' for DESC
   String? group,              // sidebar section label
 })
 ```
+
+A password column stores exactly what is typed unless you give it an
+`onSave` hook, and the studio warns at startup when one has none. Hash it
+with the same function your app uses:
+
+```dart
+studio.register<User>(
+  UserTable.metadata,
+  onSave: {'password': (v) => hashPassword(v as String)},
+);
+```
+
+Leaving a password blank on edit keeps the stored value and skips the hook.
+Throw a `FormatException` from a hook to show its message on the field.
 
 ### `handler`
 

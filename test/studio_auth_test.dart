@@ -131,4 +131,82 @@ void main() {
       expect(res.headers['set-cookie'], contains('Path=/studio'));
     });
   });
+
+  group('ST-05 forms, cookies and sign-in', () {
+    late Handler h;
+
+    setUp(() async {
+      final studio = GisilaStudio(
+          db: await _db(),
+          username: 'admin',
+          password: _goodPassword,
+          secret: _goodSecret);
+      h = studio.handler(prefix: '/studio');
+    });
+
+    Future<Response> send(String method, String path,
+            {String? body, Map<String, String> headers = const {}}) async =>
+        await h(Request(method, Uri.parse('http://localhost/studio$path'),
+            handlerPath: '/studio/',
+            body: body,
+            headers: {
+              'content-type': 'application/x-www-form-urlencoded',
+              ...headers,
+            }));
+
+    Future<Response> login(String password,
+            {Map<String, String> headers = const {}}) =>
+        send('POST', '/login/',
+            body: 'username=admin&password=$password', headers: headers);
+
+    Future<String> cookie() async {
+      final res = await login(_goodPassword);
+      return res.headers['set-cookie']!.split(';').first;
+    }
+
+    test('POSTs need the session CSRF token', () async {
+      final c = await cookie();
+      final token = c.split('=').skip(1).join('=');
+      final missing = await send('POST', '/logout/', headers: {'cookie': c});
+      expect(missing.statusCode, 403);
+      final wrong = await send('POST', '/logout/',
+          body: '_csrf=nope', headers: {'cookie': c});
+      expect(wrong.statusCode, 403);
+      final ok = await send('POST', '/logout/',
+          body: '_csrf=${studioCsrfToken(token)}', headers: {'cookie': c});
+      expect(ok.statusCode, 302);
+    });
+
+    test('rendered POST forms carry the token', () async {
+      final c = await cookie();
+      final token = c.split('=').skip(1).join('=');
+      final res = await send('GET', '/', headers: {'cookie': c});
+      final html = await res.readAsString();
+      expect(html, contains('<form method="post" action="/studio/logout/"'));
+      expect(html, contains('name="_csrf" value="${studioCsrfToken(token)}"'));
+    });
+
+    test('the cookie is Secure behind an HTTPS proxy', () async {
+      final plain = await login(_goodPassword);
+      expect(plain.headers['set-cookie'], isNot(contains('Secure')));
+      final https =
+          await login(_goodPassword, headers: {'x-forwarded-proto': 'https'});
+      expect(https.headers['set-cookie'], contains('; Secure'));
+    });
+
+    test('repeated failures lock sign-in for a while', () async {
+      for (var i = 0; i < 10; i++) {
+        expect((await login('wrong-password-$i')).statusCode, 401);
+      }
+      final locked = await login(_goodPassword);
+      expect(locked.statusCode, 429);
+      expect(locked.headers['retry-after'], isNotNull);
+    });
+
+    test('constantTimeEquals', () {
+      expect(constantTimeEquals('abc', 'abc'), isTrue);
+      expect(constantTimeEquals('abc', 'abd'), isFalse);
+      expect(constantTimeEquals('abc', 'abcd'), isFalse);
+    });
+  });
 }
