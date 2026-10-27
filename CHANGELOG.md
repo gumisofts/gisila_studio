@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+- Docs: the README no longer promises sortable column headers (lists use
+  `ordering`) and describes the current login, CSRF and password-field
+  behaviour.
 - `register()` takes `onSave:`, per-column hooks that transform a submitted
   value before it is written (hash a password, normalise an email). A
   `FormatException` from a hook is shown on the field. Password columns
