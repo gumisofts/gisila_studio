@@ -2,7 +2,7 @@ name: gisila_studio
 description: >-
   Web-based admin interface for gisila models, inspired by Django admin.
   Auto-generates CRUD UI from TableMeta registrations, served over Shelf.
-version: 0.2.0
+version: 0.3.0
 repository: https://github.com/gumisofts/gisila
 
 environment:
@@ -10,7 +10,7 @@ environment:
 
 dependencies:
   crypto: ^3.0.7
-  gisila_orm: ^0.1.1
+  gisila_orm: ^0.2.0
   shelf: ^1.4.1
   shelf_router: ^1.1.4
 

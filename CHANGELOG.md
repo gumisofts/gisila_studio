@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 0.3.0 — 2026-10-28 (BREAKING)
+
+- Requires gisila_orm ^0.2.0 (was ^0.1.1).
 
 - Docs: the README no longer promises sortable column headers (lists use
   `ordering`) and describes the current login, CSRF and password-field
